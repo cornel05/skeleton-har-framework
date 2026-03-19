@@ -1,0 +1,21 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+env/
+venv/
+ENV/
+
+# Data and models
+dataset/
+models/*.pt
+models/*.onnx
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# OS-specific
+.DS_Store
+Thumbs.db
