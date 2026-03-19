@@ -151,6 +151,15 @@ def resolve_device(device_arg: str) -> str:
 	return "cpu"
 
 
+def apply_unit_scale(coco: np.ndarray, eps: float) -> None:
+	"""Scale x/y by neck-to-mid-hip distance with epsilon-safe denominator."""
+	neck = (coco[5, :2] + coco[6, :2]) / 2.0
+	mid_hip = (coco[11, :2] + coco[12, :2]) / 2.0
+	scale = float(np.linalg.norm(neck - mid_hip))
+	safe_scale = max(scale, eps)
+	coco[:, :2] /= safe_scale
+
+
 def pick_pose_from_result(
 	result,
 	annotation_bbox: Optional[Tuple[int, int, int, int]],
@@ -209,6 +218,7 @@ def extract_video_pose(
 	device: str,
 	imgsz: int,
 	conf_thres: float,
+	scale_eps: float,
 ) -> int:
 	cap = cv2.VideoCapture(str(video_path))
 	if not cap.isOpened():
@@ -271,6 +281,7 @@ def extract_video_pose(
 						r_hip = coco[12, :2]
 						mid_hip = (l_hip + r_hip) / 2.0
 						coco[:, :2] -= mid_hip
+						apply_unit_scale(coco, eps=scale_eps)
 
 						sequence[frame_idx] = coco
 
@@ -304,6 +315,7 @@ def process_dataset(
 	device: str,
 	imgsz: int,
 	conf_thres: float,
+	scale_eps: float,
 ) -> None:
 	videos = discover_videos(dataset_root)
 	if not videos:
@@ -347,6 +359,7 @@ def process_dataset(
 				device=resolved_device,
 				imgsz=imgsz,
 				conf_thres=conf_thres,
+				scale_eps=scale_eps,
 			)
 			metadata.append(
 				{
@@ -415,6 +428,12 @@ def parse_args() -> argparse.Namespace:
 		default=0.25,
 		help="YOLO confidence threshold.",
 	)
+	parser.add_argument(
+		"--scale-eps",
+		type=float,
+		default=1e-6,
+		help="Epsilon floor for neck-to-mid-hip scale denominator.",
+	)
 	return parser.parse_args()
 
 
@@ -428,6 +447,7 @@ def main() -> None:
 		device=args.device,
 		imgsz=args.imgsz,
 		conf_thres=args.conf,
+		scale_eps=args.scale_eps,
 	)
 
 
