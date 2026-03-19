@@ -1,6 +1,6 @@
-# Pose Estimation Project
+# skeleton-har-framework
 
-A production-ready project for pose extraction from videos using Mediapipe and YOLOv8.
+A production-ready project for E2E Skeleton-based Human Action Recognition (HAR), focusing on fall detection and pose extraction.
 
 ## Project Structure
 
@@ -12,25 +12,36 @@ A production-ready project for pose extraction from videos using Mediapipe and Y
 
 ## Setup
 
-1.  **Environment:**
+1.  **Install uv (Package Manager):**
+    If you haven't installed `uv` yet, follow the [official installation guide](https://docs.astral.sh/uv/getting-started/installation/):
     ```bash
-    python -m venv .venv
-    source .venv/bin/activate
-    pip install -r requirements.txt
+    # For Linux and macOS
+    curl -LsSf https://astral.sh/uv/install.sh | sh
     ```
 
-2.  **Models:**
+2.  **Environment Setup:**
+    ```bash
+    # Create and sync the virtual environment using uv
+    uv venv
+    source .venv/bin/activate
+    uv pip install -r requirements.txt
+    ```
+
+3.  **Models:**
     Place pre-trained YOLO weights in the `models/` folder.
 
 ## Usage
 
 - **Pose Extraction:**
   ```bash
-  python scripts/pose_extraction.py --video path/to/video.mp4
+  uv run scripts/pose_extraction.py --video path/to/video.mp4
   ```
 
 - **Dataset Processing:**
-  Check the `scripts/` directory for dataset-specific processing scripts.
+  Check the `scripts/` directory for dataset-specific processing scripts. Use `uv run` to execute them:
+  ```bash
+  uv run scripts/urfall_process.py
+  ```
 
 ## License
 MIT (or your choice)
