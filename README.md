@@ -43,5 +43,18 @@ A production-ready project for E2E Skeleton-based Human Action Recognition (HAR)
   uv run scripts/urfall_process.py
   ```
 
+- **Mirror Augmentation (Integrated During Processing):**
+  Use `--mirror-aug` to also generate mirrored skeleton files while processing:
+  ```bash
+  uv run scripts/urfall_process.py --mirror-aug
+  uv run scripts/le2i_process.py --mirror-aug
+  ```
+
+- **Mirror Augmentation (One-Pass Over Existing .npy Files):**
+  Run one-time augmentation on extracted skeleton files:
+  ```bash
+  uv run scripts/mirror_augment_pose_npy.py --folder dataset/pose_npy
+  ```
+
 ## License
 MIT (or your choice)

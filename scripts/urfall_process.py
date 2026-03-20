@@ -32,6 +32,37 @@ def apply_unit_scale(coco: np.ndarray, eps: float) -> None:
 	coco[:, :2] /= safe_scale
 
 
+def mirror_coco17_sequence(sequence: np.ndarray) -> np.ndarray:
+	"""Mirror centered COCO17 sequence horizontally and swap left/right joints."""
+	if sequence.ndim != 3:
+		raise ValueError(f"Expected 3D array (T, K, C), got {sequence.shape}")
+	if sequence.shape[1] < 17:
+		raise ValueError(f"Expected at least 17 keypoints, got {sequence.shape}")
+	if sequence.shape[2] < 2:
+		raise ValueError(f"Expected at least 2 channels [x, y], got {sequence.shape}")
+
+	mirrored = sequence.astype(np.float32, copy=True)
+	# Sequence is centered around mid-hip, so horizontal mirror is x -> -x.
+	mirrored[:, :, 0] = -mirrored[:, :, 0]
+
+	left_right_pairs = (
+		(1, 2),
+		(3, 4),
+		(5, 6),
+		(7, 8),
+		(9, 10),
+		(11, 12),
+		(13, 14),
+		(15, 16),
+	)
+	for left_idx, right_idx in left_right_pairs:
+		tmp = mirrored[:, left_idx, :].copy()
+		mirrored[:, left_idx, :] = mirrored[:, right_idx, :]
+		mirrored[:, right_idx, :] = tmp
+
+	return mirrored
+
+
 @dataclass
 class VideoItem:
 	folder_name: str
@@ -204,6 +235,7 @@ def process_dataset(
 	imgsz: int,
 	conf_thres: float,
 	scale_eps: float,
+	mirror_aug: bool,
 ) -> None:
 	items = discover_videos(dataset_root)
 	if not items:
@@ -247,6 +279,24 @@ def process_dataset(
 			)
 		except Exception as exc:  # noqa: BLE001
 			print(f"[ERROR] Failed processing {item.video_path}: {exc}")
+			continue
+
+		if mirror_aug:
+			mirror_output_path = output_dir / f"{item.folder_name}_skeleton_mirror.npy"
+			try:
+				mirrored = mirror_coco17_sequence(skeleton)
+				np.save(mirror_output_path, mirrored)
+				rows.append(
+					[
+						f"{item.folder_name}_mirror",
+						str(item.video_path.relative_to(dataset_root)),
+						str(mirror_output_path.relative_to(output_dir)),
+						str(item.label),
+						str(mirrored.shape[0]),
+					]
+				)
+			except Exception as exc:  # noqa: BLE001
+				print(f"[WARN] Failed mirror augmentation for {item.video_path}: {exc}")
 
 	with summary_csv.open("w", newline="", encoding="utf-8") as f:
 		writer = csv.writer(f)
@@ -307,6 +357,11 @@ def parse_args() -> argparse.Namespace:
 		default=1e-6,
 		help="Epsilon floor for neck-to-mid-hip scale denominator.",
 	)
+	parser.add_argument(
+		"--mirror-aug",
+		action="store_true",
+		help="Also save mirrored skeleton sequence for each video.",
+	)
 	return parser.parse_args()
 
 
@@ -327,6 +382,7 @@ def main() -> None:
 		imgsz=args.imgsz,
 		conf_thres=args.conf,
 		scale_eps=args.scale_eps,
+		mirror_aug=args.mirror_aug,
 	)
 
 
