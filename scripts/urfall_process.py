@@ -34,14 +34,12 @@ def apply_unit_scale(coco: np.ndarray, eps: float) -> None:
 
 def mirror_coco17_sequence(sequence: np.ndarray) -> np.ndarray:
 	"""Mirror centered COCO17 sequence horizontally and swap left/right joints."""
-	if sequence.ndim != 3:
-		raise ValueError(f"Expected 3D array (T, K, C), got {sequence.shape}")
-	if sequence.shape[1] < 17:
-		raise ValueError(f"Expected at least 17 keypoints, got {sequence.shape}")
-	if sequence.shape[2] < 2:
-		raise ValueError(f"Expected at least 2 channels [x, y], got {sequence.shape}")
+	if sequence.ndim != 2 or sequence.shape[1] != 34:
+		raise ValueError(f"Expected 2D array (T, 34), got {sequence.shape}")
 
-	mirrored = sequence.astype(np.float32, copy=True)
+	# Reshape to (T, 17, 2) for processing
+	mirrored = sequence.reshape(sequence.shape[0], 17, 2).astype(np.float32, copy=True)
+	
 	# Sequence is centered around mid-hip, so horizontal mirror is x -> -x.
 	mirrored[:, :, 0] = -mirrored[:, :, 0]
 
@@ -60,7 +58,8 @@ def mirror_coco17_sequence(sequence: np.ndarray) -> np.ndarray:
 		mirrored[:, left_idx, :] = mirrored[:, right_idx, :]
 		mirrored[:, right_idx, :] = tmp
 
-	return mirrored
+	# Flatten back to (T, 34)
+	return mirrored.reshape(mirrored.shape[0], 34)
 
 
 @dataclass
@@ -169,7 +168,7 @@ def extract_skeleton_sequence(
 	if total_frames <= 0:
 		total_frames = 1
 
-	sequence = np.zeros((total_frames, 17, 3), dtype=np.float32)
+	sequence = np.zeros((total_frames, 34), dtype=np.float32)
 
 	frame_idx = 0
 	frame_bar = tqdm(
@@ -186,7 +185,7 @@ def extract_skeleton_sequence(
 				break
 
 			if frame_idx >= sequence.shape[0]:
-				extra = np.zeros((1, 17, 3), dtype=np.float32)
+				extra = np.zeros((1, 34), dtype=np.float32)
 				sequence = np.concatenate([sequence, extra], axis=0)
 
 			results = model.predict(
@@ -213,7 +212,8 @@ def extract_skeleton_sequence(
 					coco[:, :2] -= mid_hip
 					apply_unit_scale(coco, eps=scale_eps)
 
-					sequence[frame_idx] = coco
+					# Flatten to (34,): concatenate all x,y coordinates
+					sequence[frame_idx] = coco[:, :2].flatten()
 
 			frame_idx += 1
 			frame_bar.update(1)

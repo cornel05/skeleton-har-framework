@@ -9,6 +9,6 @@ if data_path.exists():
     data = np.load(data_path)
     print(f"Loaded: {data_path}")
     print(f"Shape: {data.shape}")
-    print(data[:10])
+    # print(data[:10])
 else:
     print(f"File not found: {data_path}")
