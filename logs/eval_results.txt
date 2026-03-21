@@ -1,0 +1,179 @@
+Using device: cuda
+Loading dataset...
+Dataset loaded: 320 train, 80 val
+Feature dimension: 34
+
+Testing 24 hyperparameter combinations...
+================================================================================
+
+[1/24] Testing: hidden=32, lr=0.001, layers=1, dropout=0.2
+  Epoch  5: train_loss=0.5589, val_loss=0.6015, val_acc=0.6250
+  Epoch 10: train_loss=0.5260, val_loss=0.5632, val_acc=0.6375
+  Epoch 15: train_loss=0.5355, val_loss=0.5590, val_acc=0.6375
+  ✓ Best accuracy: 0.7500, Final accuracy: 0.6125, Time: 2.10s
+
+[2/24] Testing: hidden=32, lr=0.001, layers=1, dropout=0.5
+  Epoch  5: train_loss=0.5452, val_loss=0.5372, val_acc=0.6625
+  Epoch 10: train_loss=0.5510, val_loss=0.5774, val_acc=0.6500
+  Epoch 15: train_loss=0.5614, val_loss=0.5473, val_acc=0.6750
+  ✓ Best accuracy: 0.7375, Final accuracy: 0.7375, Time: 1.88s
+
+[3/24] Testing: hidden=32, lr=0.001, layers=2, dropout=0.2
+  Epoch  5: train_loss=0.5336, val_loss=0.6120, val_acc=0.6750
+  Epoch 10: train_loss=0.5633, val_loss=0.5558, val_acc=0.6875
+  Epoch 15: train_loss=0.5486, val_loss=0.5287, val_acc=0.6875
+  ✓ Best accuracy: 0.7125, Final accuracy: 0.7250, Time: 2.21s
+
+[4/24] Testing: hidden=32, lr=0.001, layers=2, dropout=0.5
+  Epoch  5: train_loss=0.5407, val_loss=0.5265, val_acc=0.7125
+  Epoch 10: train_loss=0.5469, val_loss=0.5112, val_acc=0.6625
+  Epoch 15: train_loss=0.5748, val_loss=0.5927, val_acc=0.6875
+  ✓ Best accuracy: 0.7500, Final accuracy: 0.7125, Time: 2.15s
+
+[5/24] Testing: hidden=32, lr=0.0005, layers=1, dropout=0.2
+  Epoch  5: train_loss=0.5895, val_loss=0.5475, val_acc=0.6875
+  Epoch 10: train_loss=0.5562, val_loss=0.5830, val_acc=0.6500
+  Epoch 15: train_loss=0.5185, val_loss=0.5554, val_acc=0.6750
+  ✓ Best accuracy: 0.7750, Final accuracy: 0.6750, Time: 1.91s
+
+[6/24] Testing: hidden=32, lr=0.0005, layers=1, dropout=0.5
+  Epoch  5: train_loss=0.5953, val_loss=0.5787, val_acc=0.6625
+  Epoch 10: train_loss=0.5593, val_loss=0.5594, val_acc=0.6250
+  Epoch 15: train_loss=0.5360, val_loss=0.5425, val_acc=0.6500
+  ✓ Best accuracy: 0.7500, Final accuracy: 0.7375, Time: 1.82s
+
+[7/24] Testing: hidden=32, lr=0.0005, layers=2, dropout=0.2
+  Epoch  5: train_loss=0.5918, val_loss=0.5267, val_acc=0.7500
+  Epoch 10: train_loss=0.5586, val_loss=0.5941, val_acc=0.6875
+  Epoch 15: train_loss=0.5395, val_loss=0.5007, val_acc=0.7250
+  ✓ Best accuracy: 0.7500, Final accuracy: 0.6500, Time: 2.23s
+
+[8/24] Testing: hidden=32, lr=0.0005, layers=2, dropout=0.5
+  Epoch  5: train_loss=0.5553, val_loss=0.5609, val_acc=0.6625
+  Epoch 10: train_loss=0.5287, val_loss=0.5620, val_acc=0.6625
+  Epoch 15: train_loss=0.5306, val_loss=0.5013, val_acc=0.6875
+  ✓ Best accuracy: 0.7125, Final accuracy: 0.7000, Time: 2.25s
+
+[9/24] Testing: hidden=64, lr=0.001, layers=1, dropout=0.2
+  Epoch  5: train_loss=0.5467, val_loss=0.5683, val_acc=0.6250
+  Epoch 10: train_loss=0.5475, val_loss=0.5533, val_acc=0.7125
+  Epoch 15: train_loss=0.5291, val_loss=0.5448, val_acc=0.7125
+  ✓ Best accuracy: 0.7500, Final accuracy: 0.7125, Time: 1.84s
+
+[10/24] Testing: hidden=64, lr=0.001, layers=1, dropout=0.5
+  Epoch  5: train_loss=0.5401, val_loss=0.5426, val_acc=0.6500
+  Epoch 10: train_loss=0.5453, val_loss=0.5324, val_acc=0.6625
+  Epoch 15: train_loss=0.5274, val_loss=0.5690, val_acc=0.6375
+  ✓ Best accuracy: 0.7625, Final accuracy: 0.6875, Time: 1.89s
+
+[11/24] Testing: hidden=64, lr=0.001, layers=2, dropout=0.2
+  Epoch  5: train_loss=0.5922, val_loss=0.5699, val_acc=0.6625
+  Epoch 10: train_loss=0.5630, val_loss=0.5312, val_acc=0.6875
+  Epoch 15: train_loss=0.5203, val_loss=0.5481, val_acc=0.6625
+  ✓ Best accuracy: 0.7500, Final accuracy: 0.6625, Time: 2.25s
+
+[12/24] Testing: hidden=64, lr=0.001, layers=2, dropout=0.5
+  Epoch  5: train_loss=0.5585, val_loss=0.5699, val_acc=0.5875
+  Epoch 10: train_loss=0.5439, val_loss=0.5902, val_acc=0.6875
+  Epoch 15: train_loss=0.5363, val_loss=0.5418, val_acc=0.7000
+  ✓ Best accuracy: 0.7250, Final accuracy: 0.7000, Time: 2.57s
+
+[13/24] Testing: hidden=64, lr=0.0005, layers=1, dropout=0.2
+  Epoch  5: train_loss=0.5530, val_loss=0.5575, val_acc=0.5750
+  Epoch 10: train_loss=0.5634, val_loss=0.4534, val_acc=0.7625
+  Epoch 15: train_loss=0.5424, val_loss=0.5551, val_acc=0.6250
+  ✓ Best accuracy: 0.7625, Final accuracy: 0.6625, Time: 1.93s
+
+[14/24] Testing: hidden=64, lr=0.0005, layers=1, dropout=0.5
+  Epoch  5: train_loss=0.5462, val_loss=0.4953, val_acc=0.7625
+  Epoch 10: train_loss=0.5298, val_loss=0.4750, val_acc=0.7875
+  Epoch 15: train_loss=0.5248, val_loss=0.5561, val_acc=0.6375
+  ✓ Best accuracy: 0.7875, Final accuracy: 0.7250, Time: 1.96s
+
+[15/24] Testing: hidden=64, lr=0.0005, layers=2, dropout=0.2
+  Epoch  5: train_loss=0.5734, val_loss=0.5617, val_acc=0.7125
+  Epoch 10: train_loss=0.5161, val_loss=0.5334, val_acc=0.6750
+  Epoch 15: train_loss=0.5260, val_loss=0.5722, val_acc=0.6875
+  ✓ Best accuracy: 0.7500, Final accuracy: 0.6875, Time: 2.15s
+
+[16/24] Testing: hidden=64, lr=0.0005, layers=2, dropout=0.5
+  Epoch  5: train_loss=0.5424, val_loss=0.5976, val_acc=0.6625
+  Epoch 10: train_loss=0.5493, val_loss=0.4767, val_acc=0.7750
+  Epoch 15: train_loss=0.5268, val_loss=0.4370, val_acc=0.7500
+  ✓ Best accuracy: 0.7750, Final accuracy: 0.6375, Time: 2.23s
+
+[17/24] Testing: hidden=128, lr=0.001, layers=1, dropout=0.2
+  Epoch  5: train_loss=0.5651, val_loss=0.5333, val_acc=0.6625
+  Epoch 10: train_loss=0.5544, val_loss=0.5589, val_acc=0.6875
+  Epoch 15: train_loss=0.5519, val_loss=0.5052, val_acc=0.7750
+  ✓ Best accuracy: 0.7750, Final accuracy: 0.7125, Time: 1.90s
+
+[18/24] Testing: hidden=128, lr=0.001, layers=1, dropout=0.5
+  Epoch  5: train_loss=0.5116, val_loss=0.6094, val_acc=0.6625
+  Epoch 10: train_loss=0.5381, val_loss=0.5285, val_acc=0.6500
+  Epoch 15: train_loss=0.5807, val_loss=0.5737, val_acc=0.6625
+  ✓ Best accuracy: 0.7500, Final accuracy: 0.7000, Time: 1.98s
+
+[19/24] Testing: hidden=128, lr=0.001, layers=2, dropout=0.2
+  Epoch  5: train_loss=0.5569, val_loss=0.5216, val_acc=0.6875
+  Epoch 10: train_loss=0.5337, val_loss=0.5402, val_acc=0.6250
+  Epoch 15: train_loss=0.5395, val_loss=0.5596, val_acc=0.6750
+  ✓ Best accuracy: 0.7500, Final accuracy: 0.7000, Time: 2.28s
+
+[20/24] Testing: hidden=128, lr=0.001, layers=2, dropout=0.5
+  Epoch  5: train_loss=0.5699, val_loss=0.5351, val_acc=0.6500
+  Epoch 10: train_loss=0.5437, val_loss=0.5526, val_acc=0.7125
+  Epoch 15: train_loss=0.5405, val_loss=0.5302, val_acc=0.7500
+  ✓ Best accuracy: 0.7500, Final accuracy: 0.7625, Time: 2.32s
+
+[21/24] Testing: hidden=128, lr=0.0005, layers=1, dropout=0.2
+  Epoch  5: train_loss=0.5404, val_loss=0.5293, val_acc=0.7500
+  Epoch 10: train_loss=0.5761, val_loss=0.5471, val_acc=0.6750
+  Epoch 15: train_loss=0.5656, val_loss=0.5896, val_acc=0.6000
+  ✓ Best accuracy: 0.7500, Final accuracy: 0.6625, Time: 2.03s
+
+[22/24] Testing: hidden=128, lr=0.0005, layers=1, dropout=0.5
+  Epoch  5: train_loss=0.5856, val_loss=0.5688, val_acc=0.6375
+  Epoch 10: train_loss=0.5637, val_loss=0.5457, val_acc=0.6750
+  Epoch 15: train_loss=0.5558, val_loss=0.4814, val_acc=0.7500
+  ✓ Best accuracy: 0.7500, Final accuracy: 0.7000, Time: 2.18s
+
+[23/24] Testing: hidden=128, lr=0.0005, layers=2, dropout=0.2
+  Epoch  5: train_loss=0.5587, val_loss=0.5369, val_acc=0.6875
+  Epoch 10: train_loss=0.5621, val_loss=0.5708, val_acc=0.6625
+  Epoch 15: train_loss=0.5442, val_loss=0.5632, val_acc=0.6000
+  ✓ Best accuracy: 0.7375, Final accuracy: 0.6250, Time: 2.35s
+
+[24/24] Testing: hidden=128, lr=0.0005, layers=2, dropout=0.5
+  Epoch  5: train_loss=0.5692, val_loss=0.5596, val_acc=0.6500
+  Epoch 10: train_loss=0.5292, val_loss=0.5236, val_acc=0.6750
+  Epoch 15: train_loss=0.5168, val_loss=0.4790, val_acc=0.7250
+  ✓ Best accuracy: 0.7375, Final accuracy: 0.7125, Time: 2.17s
+
+================================================================================
+EVALUATION RESULTS (sorted by best validation accuracy)
+================================================================================
+Rank  Hidden   LR         Layers   Dropout    Best Acc     Final Acc    Time(s) 
+--------------------------------------------------------------------------------
+1     64       0.00050    1        0.5        0.7875       0.7250       1.96    
+2     32       0.00050    1        0.2        0.7750       0.6750       1.91    
+3     64       0.00050    2        0.5        0.7750       0.6375       2.23    
+4     128      0.00100    1        0.2        0.7750       0.7125       1.90    
+5     64       0.00100    1        0.5        0.7625       0.6875       1.89    
+6     64       0.00050    1        0.2        0.7625       0.6625       1.93    
+7     32       0.00100    1        0.2        0.7500       0.6125       2.10    
+8     32       0.00100    2        0.5        0.7500       0.7125       2.15    
+9     32       0.00050    1        0.5        0.7500       0.7375       1.82    
+10    32       0.00050    2        0.2        0.7500       0.6500       2.23    
+
+================================================================================
+BEST MODEL CONFIGURATION
+================================================================================
+Hidden size: 64
+Learning rate: 0.0005
+Number of layers: 1
+Dropout: 0.5
+Best validation accuracy: 0.7875 (78.75%)
+Final validation accuracy: 0.7250 (72.50%)
+Validation loss: 0.4942
+Training time: 1.96s

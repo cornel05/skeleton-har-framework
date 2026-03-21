@@ -1,0 +1,12 @@
+Feature Dim: 34
+Sequence Length: 32
+Hidden Size: 64
+Num Layers: 1
+Dropout: 0.5
+
+Test Results:
+Accuracy: 0.6667
+Precision: 0.8108
+Recall: 0.7895
+F1-score: 0.8000
+ROC-AUC: 0.8289
