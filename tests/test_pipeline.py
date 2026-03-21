@@ -5,17 +5,22 @@ Run with:
   python test_pipeline.py
 """
 
+import sys
+import os
+from pathlib import Path
+
+# Add src to sys.path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 import tempfile
-import os
-from pathlib import Path
 
-from src.pose_estimation.dataset import SkeletonDataset, collate_fn_skeleton
-from src.pose_estimation.model import SkeletonLSTM, SkeletonLSTMWithAttention
-from src.pose_estimation.utils import (
+from pose_estimation.dataset import SkeletonDataset, collate_fn_skeleton
+from pose_estimation.model import SkeletonLSTM, SkeletonLSTMWithAttention
+from pose_estimation.utils import (
     normalize_skeleton,
     train_val_test_split,
     compute_metrics,

@@ -6,7 +6,7 @@ and gather the best evaluation results for the fall detection model.
 
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 import torch
 import torch.nn as nn

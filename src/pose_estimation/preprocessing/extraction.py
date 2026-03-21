@@ -1,7 +1,6 @@
 import argparse
 import logging
 from pathlib import Path
-
 import cv2
 import mediapipe as mp
 import numpy as np
@@ -13,10 +12,10 @@ if not hasattr(mp, "solutions"):
     )
 
 mp_pose = mp.solutions.pose
-pose = mp_pose.Pose()
 
 
 def extract_keypoints(video_path):
+    pose = mp_pose.Pose()
     video_path = str(video_path)
     logging.info("Starting keypoint extraction: %s", video_path)
 
@@ -90,51 +89,26 @@ def save_keypoints(keypoints, output_path):
     logging.info("Saved keypoints to %s", output_path)
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Extract pose keypoints from one video or a batch of videos.")
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--video", type=str, help="Path to a single .mp4 video file.")
-    group.add_argument(
-        "--folder",
-        type=str,
-        help="Parent folder whose subfolders contain .mp4 files to process in batch.",
-    )
-    parser.add_argument(
-        "--output",
-        type=str,
-        default=None,
-        help="Optional output directory for .npy files. Defaults to each video's folder.",
-    )
-    return parser.parse_args()
-
-
 def main():
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s | %(levelname)s | %(message)s",
-    )
-
-    args = parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
+    parser = argparse.ArgumentParser(description="MediaPipe pose extraction.")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--video", type=str)
+    group.add_argument("--folder", type=str)
+    parser.add_argument("--output", type=str, default=None)
+    args = parser.parse_args()
 
     if args.folder:
         videos = find_mp4_videos_in_subfolders(args.folder)
-        if not videos:
-            logging.warning("No .mp4 videos found in subfolders for: %s", args.folder)
-            return
-
-        logging.info("Batch mode started for %d video(s).", len(videos))
         for idx, video_path in enumerate(videos, start=1):
             logging.info("[%d/%d] Processing %s", idx, len(videos), video_path)
             keypoints = extract_keypoints(video_path)
-            output_path = build_output_path(video_path, output_dir=args.output, batch_parent=args.folder)
-            save_keypoints(keypoints, output_path)
-            logging.info("[%d/%d] Output shape: %s", idx, len(videos), keypoints.shape)
+            out_path = build_output_path(video_path, output_dir=args.output, batch_parent=args.folder)
+            save_keypoints(keypoints, out_path)
     else:
-        logging.info("Single video mode started.")
         keypoints = extract_keypoints(args.video)
-        output_path = build_output_path(args.video, output_dir=args.output)
-        save_keypoints(keypoints, output_path)
-        logging.info("Output shape: %s", keypoints.shape)
+        out_path = build_output_path(args.video, output_dir=args.output)
+        save_keypoints(keypoints, out_path)
 
 
 if __name__ == "__main__":
