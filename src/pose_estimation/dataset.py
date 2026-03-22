@@ -10,6 +10,12 @@ import torch
 from torch.utils.data import Dataset
 from typing import Tuple, List, Union, Optional
 
+try:
+    from .config import DATASET_CFG
+except ImportError:
+    # Fallback if config is not available or if this script is executed directly
+    DATASET_CFG = {}
+
 
 class SkeletonDataset(Dataset):
     """
@@ -30,7 +36,8 @@ class SkeletonDataset(Dataset):
         root_dir: str,
         file_paths: List[str],
         labels: List[int],
-        sequence_length: int = 32
+        sequence_length: int = DATASET_CFG.get("sequence_length", 32),
+        sampling_mode: str = "random",
     ):
         """
         Initialize the skeleton dataset.
@@ -55,6 +62,9 @@ class SkeletonDataset(Dataset):
         self.file_list = file_paths
         self.labels = labels
         self.sequence_length = sequence_length
+        if sampling_mode not in {"random", "center"}:
+            raise ValueError("sampling_mode must be one of: 'random', 'center'")
+        self.sampling_mode = sampling_mode
         
         # Convert to absolute paths
         self.abs_file_list = [
@@ -101,8 +111,12 @@ class SkeletonDataset(Dataset):
         
         # Handle variable-length sequences
         if sequence_len >= self.sequence_length:
-            # Randomly sample a contiguous window of length T
-            sequence, mask = self._sample_window(skeleton)
+            if self.sampling_mode == "random":
+                # Random windowing for training-time temporal augmentation.
+                sequence, mask = self._sample_window(skeleton)
+            else:
+                # Deterministic center windowing for stable validation/test metrics.
+                sequence, mask = self._center_window(skeleton)
         else:
             # Pad with zeros to reach target length T
             sequence, mask = self._pad_sequence(skeleton)
@@ -139,6 +153,14 @@ class SkeletonDataset(Dataset):
         mask = np.ones(self.sequence_length, dtype=np.float32)
         
         return sampled_skeleton.astype(np.float32), mask
+
+    def _center_window(self, skeleton: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Deterministically extract a centered contiguous window of length T."""
+        seq_len, _ = skeleton.shape
+        start_idx = max(0, (seq_len - self.sequence_length) // 2)
+        centered_skeleton = skeleton[start_idx:start_idx + self.sequence_length]
+        mask = np.ones(self.sequence_length, dtype=np.float32)
+        return centered_skeleton.astype(np.float32), mask
     
     def _pad_sequence(self, skeleton: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """

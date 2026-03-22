@@ -16,6 +16,7 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
+from collections import defaultdict
 
 
 def resolve_device(device_arg: str = "auto") -> torch.device:
@@ -379,8 +380,8 @@ def train_val_test_split(
         raise ValueError("train_ratio must be in (0, 1)")
     if not (0.0 <= val_ratio < 1.0):
         raise ValueError("val_ratio must be in [0, 1)")
-    if train_ratio + val_ratio >= 1.0:
-        raise ValueError("train_ratio + val_ratio must be < 1")
+    if train_ratio + val_ratio > 1.0:
+        raise ValueError("train_ratio + val_ratio must be <= 1.0")
 
     indices = np.arange(len(file_list))
     labels_arr = np.asarray(labels)
@@ -428,6 +429,89 @@ def train_val_test_split(
     test_files = [file_list[int(i)] for i in test_indices]
     test_labels = [int(label) for label in test_labels_arr]
     
+    return (train_files, train_labels), (val_files, val_labels), (test_files, test_labels)
+
+
+def train_val_test_split_grouped(
+    file_list: List[str],
+    labels: List[int],
+    group_ids: List[str],
+    train_ratio: float = 0.7,
+    val_ratio: float = 0.15,
+    random_seed: int = 42
+) -> Tuple[Tuple[List, List], Tuple[List, List], Tuple[List, List]]:
+    """
+    Split data into train/validation/test while keeping grouped samples together.
+
+    This is useful when augmented variants (e.g., original and mirrored files)
+    must not be distributed across different splits.
+    """
+    if len(file_list) != len(labels) or len(file_list) != len(group_ids):
+        raise ValueError("file_list, labels, and group_ids must have the same length")
+    if not (0.0 < train_ratio < 1.0):
+        raise ValueError("train_ratio must be in (0, 1)")
+    if not (0.0 <= val_ratio < 1.0):
+        raise ValueError("val_ratio must be in [0, 1)")
+    if train_ratio + val_ratio > 1.0:
+        raise ValueError("train_ratio + val_ratio must be <= 1.0")
+
+    grouped_indices = defaultdict(list)
+    grouped_labels = {}
+
+    for idx, (grp, lbl) in enumerate(zip(group_ids, labels)):
+        grouped_indices[grp].append(idx)
+        if grp in grouped_labels and grouped_labels[grp] != lbl:
+            raise ValueError(f"Inconsistent labels within group '{grp}'")
+        grouped_labels[grp] = lbl
+
+    unique_groups = np.asarray(list(grouped_indices.keys()))
+    unique_group_labels = np.asarray([grouped_labels[g] for g in unique_groups])
+
+    stratify_groups = unique_group_labels if len(np.unique(unique_group_labels)) > 1 else None
+
+    # First split groups into train and remaining pool
+    train_groups, temp_groups, train_group_labels, temp_group_labels = train_test_split(
+        unique_groups,
+        unique_group_labels,
+        train_size=train_ratio,
+        random_state=random_seed,
+        shuffle=True,
+        stratify=stratify_groups,
+    )
+
+    # Then split remaining pool into val and test
+    remaining_ratio = 1.0 - train_ratio
+    if val_ratio == 0.0:
+        val_groups = np.asarray([], dtype=unique_groups.dtype)
+        test_groups = temp_groups
+    else:
+        val_within_remaining = val_ratio / remaining_ratio
+        n_val_groups = int(round(len(temp_groups) * val_within_remaining))
+        n_val_groups = max(1, min(n_val_groups, len(temp_groups) - 1))
+
+        temp_stratify = temp_group_labels if len(np.unique(temp_group_labels)) > 1 else None
+        val_groups, test_groups, _, _ = train_test_split(
+            temp_groups,
+            temp_group_labels,
+            train_size=n_val_groups,
+            random_state=random_seed,
+            shuffle=True,
+            stratify=temp_stratify,
+        )
+
+    train_indices = [i for g in train_groups for i in grouped_indices[g]]
+    val_indices = [i for g in val_groups for i in grouped_indices[g]]
+    test_indices = [i for g in test_groups for i in grouped_indices[g]]
+
+    train_files = [file_list[int(i)] for i in train_indices]
+    train_labels = [int(labels[int(i)]) for i in train_indices]
+
+    val_files = [file_list[int(i)] for i in val_indices]
+    val_labels = [int(labels[int(i)]) for i in val_indices]
+
+    test_files = [file_list[int(i)] for i in test_indices]
+    test_labels = [int(labels[int(i)]) for i in test_indices]
+
     return (train_files, train_labels), (val_files, val_labels), (test_files, test_labels)
 
 

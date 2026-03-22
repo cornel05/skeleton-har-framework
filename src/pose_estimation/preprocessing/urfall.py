@@ -8,8 +8,19 @@ from tqdm import tqdm
 from ultralytics import YOLO
 from dataclasses import dataclass
 
-from ..utils import resolve_device
-from .common import apply_unit_scale, mirror_coco17_sequence
+try:
+    from ..utils import resolve_device
+    from .common import apply_unit_scale, mirror_coco17_sequence
+except ImportError:
+    # Allow running this file directly: python src/pose_estimation/preprocessing/le2i.py
+    import sys
+
+    src_root = Path(__file__).resolve().parents[2]
+    if str(src_root) not in sys.path:
+        sys.path.insert(0, str(src_root))
+
+    from pose_estimation.utils import resolve_device
+    from pose_estimation.preprocessing.common import apply_unit_scale, mirror_coco17_sequence
 
 
 @dataclass

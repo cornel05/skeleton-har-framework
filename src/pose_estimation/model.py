@@ -10,6 +10,11 @@ import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from typing import Tuple, Optional
 
+try:
+    from .config import MODEL_CFG
+except ImportError:
+    MODEL_CFG = {}
+
 
 class SkeletonLSTM(nn.Module):
     """
@@ -36,11 +41,11 @@ class SkeletonLSTM(nn.Module):
     def __init__(
         self,
         input_dim: int,
-        hidden_size: int = 64,
-        num_layers: int = 1,
-        dropout: float = 0.5,
-        num_classes: int = 2,
-        bidirectional: bool = False
+        hidden_size: int = MODEL_CFG.get("hidden_size", 64),
+        num_layers: int = MODEL_CFG.get("num_layers", 1),
+        dropout: float = MODEL_CFG.get("dropout", 0.5),
+        num_classes: int = MODEL_CFG.get("num_classes", 2),
+        bidirectional: bool = MODEL_CFG.get("bidirectional", False)
     ):
         """
         Initialize the skeleton LSTM model.
@@ -274,12 +279,12 @@ class SkeletonLSTMWithAttention(SkeletonLSTM):
     def __init__(
         self,
         input_dim: int,
-        hidden_size: int = 64,
-        num_layers: int = 1,
-        dropout: float = 0.5,
-        num_classes: int = 2,
-        bidirectional: bool = False,
-        attention_context: int = 5
+        hidden_size: int = MODEL_CFG.get("hidden_size", 64),
+        num_layers: int = MODEL_CFG.get("num_layers", 1),
+        dropout: float = MODEL_CFG.get("dropout", 0.5),
+        num_classes: int = MODEL_CFG.get("num_classes", 2),
+        bidirectional: bool = MODEL_CFG.get("bidirectional", False),
+        attention_context: int = MODEL_CFG.get("attention_context", 5)
     ):
         """
         Initialize attention-based LSTM model.
