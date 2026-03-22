@@ -1,0 +1,30 @@
+# Unified Configuration for Pose Estimation and Fall Detection
+
+dataset:
+  root_dir: "dataset/pose_npy"
+  sequence_length: 32
+  batch_size: 8
+  sample_log_path: "dataset/testing_samples.txt"
+  sample_log_count: null
+  testing_dataset_dir: "dataset/testing_dataset"
+
+model:
+  type: "lstm" # Choose between "lstm" and "lstm_attention"
+  input_dim: 34
+  hidden_size: 64
+  num_layers: 1
+  dropout: 0.2
+  num_classes: 2
+  bidirectional: false
+  attention_context: 5
+
+training:
+  num_epochs: 50
+  learning_rate: 0.0005
+  patience: 10
+  checkpoint_path: "checkpoints/best_model.pt"
+  device: "auto" # "auto", "cuda", "cpu"
+
+inference:
+  threshold: 0.5
+  stride: 16
