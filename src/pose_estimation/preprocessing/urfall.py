@@ -40,7 +40,7 @@ except ImportError:
     from pose_estimation.features import normalize_repo_features
 
 
-BASE_URL = "http://fenix.ur.edu.pl/~mkepski/ds/data/"
+BASE_URL = "https://fenix.ur.edu.pl/~mkepski/ds/data/"
 NUM_FALLS = 30
 NUM_ADLS = 40
 LABEL_CSVS = ("urfall-cam0-falls.csv", "urfall-cam0-adls.csv")
