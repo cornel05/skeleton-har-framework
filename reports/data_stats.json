@@ -1,0 +1,78 @@
+{
+  "dataset": "urfall-cam0",
+  "videos": 70,
+  "fall_videos": 30,
+  "adl_videos": 40,
+  "groups": 70,
+  "subjects": "not published per sequence by the dataset authors (subject-level split impossible)",
+  "fps": 30.0,
+  "frames_total": 11936,
+  "frames_fall_videos": 2995,
+  "frames_adl_videos": 8941,
+  "duration_min_total": 6.631111111111111,
+  "frames_per_video": {
+    "min": 55,
+    "median": 153.5,
+    "max": 400
+  },
+  "no_person_detected_frame_rate": 0.15859584450402145,
+  "no_person_detected_frame_rate_by_class": {
+    "fall_videos": 0.04106844741235392,
+    "adl_videos": 0.19796443350855608
+  },
+  "fall_interval_frames": {
+    "min": 30,
+    "median": 30.0,
+    "max": 30
+  },
+  "fall_videos_without_fall_annotation": 0,
+  "frames_without_official_label": 392,
+  "window_length": 32,
+  "windows_train_stride": {
+    "stride": 4,
+    "pos": 293,
+    "neg": 2068,
+    "ignored": 110,
+    "neg_per_pos": 7.0580204778157
+  },
+  "windows_eval_stride": {
+    "stride": 8,
+    "pos": 147,
+    "neg": 1046,
+    "ignored": 56,
+    "neg_per_pos": 7.115646258503402
+  },
+  "fixed_split": {
+    "train": {
+      "videos": 42,
+      "fall_videos": 18,
+      "windows": {
+        "pos": 179,
+        "neg": 1284,
+        "ignored": 66,
+        "neg_per_pos": 7.173184357541899
+      }
+    },
+    "val": {
+      "videos": 14,
+      "fall_videos": 6,
+      "windows": {
+        "pos": 26,
+        "neg": 212,
+        "ignored": 7,
+        "neg_per_pos": 8.153846153846153
+      }
+    },
+    "test": {
+      "videos": 14,
+      "fall_videos": 6,
+      "windows": {
+        "pos": 30,
+        "neg": 185,
+        "ignored": 16,
+        "neg_per_pos": 6.166666666666667
+      }
+    }
+  },
+  "augmentation": "horizontal mirror (x -> -x on mid-hip-centred coords + left/right joint swap), training partition only, one mirrored copy per training window (x2)"
+}

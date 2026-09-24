@@ -1,294 +1,259 @@
+"""
+UR Fall Detection dataset (University of Rzeszow) -> YOLOv8-pose keypoints.
+
+Pipeline (one command each, see Makefile `make data`):
+    download : fetch the official cam0 RGB frame archives + per-frame label CSVs
+    extract  : run YOLOv8n-pose on every frame, keep the highest-confidence person,
+               write one raw `.npz` per sequence (pixel keypoints + confidences + box)
+               and the legacy 34-d normalized `.npy` used by the original repo.
+
+Official source: http://fenix.ur.edu.pl/~mkepski/ds/uf.html
+Only cam0 is used for the evaluation protocol: cam1 exists for falls only, so
+including it would make "camera" a proxy for the label.
+"""
+
 import argparse
-import csv
+import hashlib
+import json
+import re
+import sys
+import time
+import urllib.request
+import zipfile
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, Iterator, List, Optional, Tuple
+
 import cv2
 import numpy as np
 from tqdm import tqdm
-from ultralytics import YOLO
-from dataclasses import dataclass
 
 try:
     from ..utils import resolve_device
-    from .common import apply_unit_scale, mirror_coco17_sequence
+    from .common import mirror_coco17_sequence
+    from ..features import normalize_repo_features
 except ImportError:
-    # Allow running this file directly: python src/pose_estimation/preprocessing/le2i.py
-    import sys
-
     src_root = Path(__file__).resolve().parents[2]
     if str(src_root) not in sys.path:
         sys.path.insert(0, str(src_root))
-
     from pose_estimation.utils import resolve_device
-    from pose_estimation.preprocessing.common import apply_unit_scale, mirror_coco17_sequence
+    from pose_estimation.preprocessing.common import mirror_coco17_sequence
+    from pose_estimation.features import normalize_repo_features
 
 
-@dataclass
-class VideoItem:
-    folder_name: str
-    folder_path: Path
-    video_path: Path
-    label: int
+BASE_URL = "https://fenix.ur.edu.pl/~mkepski/ds/data/"
+NUM_FALLS = 30
+NUM_ADLS = 40
+LABEL_CSVS = ("urfall-cam0-falls.csv", "urfall-cam0-adls.csv")
+FPS = 30.0
 
 
-def infer_label(folder_name: str) -> Optional[int]:
-    lower = folder_name.lower()
-    if lower.startswith("fall-"):
-        return 1
-    if lower.startswith("adl-"):
-        return 0
-    return None
+def sequence_ids(cams: Tuple[str, ...] = ("cam0",)) -> List[str]:
+    """Return archive stems, e.g. 'fall-01-cam0-rgb'. ADLs were recorded with cam0 only."""
+    ids = []
+    for cam in cams:
+        ids += [f"fall-{i:02d}-{cam}-rgb" for i in range(1, NUM_FALLS + 1)]
+        if cam == "cam0":
+            ids += [f"adl-{i:02d}-{cam}-rgb" for i in range(1, NUM_ADLS + 1)]
+    return ids
 
 
-def find_video_file(folder_path: Path) -> Optional[Path]:
-    mp4_files = sorted(folder_path.rglob("*.mp4"))
-    if not mp4_files:
-        return None
-    return mp4_files[0]
+def sequence_name(archive_stem: str) -> str:
+    """'fall-01-cam0-rgb' -> 'fall-01' (the key used by the official label CSVs)."""
+    m = re.match(r"^((?:fall|adl)-\d+)", archive_stem)
+    if not m:
+        raise ValueError(f"Unexpected UR-Fall archive name: {archive_stem}")
+    return m.group(1)
 
 
-def discover_videos(dataset_root: Path) -> List[VideoItem]:
-    items: List[VideoItem] = []
+def _sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
-    for folder in sorted(dataset_root.iterdir()):
-        if not folder.is_dir():
-            continue
 
-        label = infer_label(folder.name)
-        if label is None:
-            continue
+def _download(url: str, dest: Path, retries: int = 4) -> None:
+    tmp = dest.with_suffix(dest.suffix + ".part")
+    for attempt in range(retries):
+        try:
+            with urllib.request.urlopen(url, timeout=120) as resp, tmp.open("wb") as out:
+                while True:
+                    chunk = resp.read(1 << 20)
+                    if not chunk:
+                        break
+                    out.write(chunk)
+            tmp.rename(dest)
+            return
+        except Exception as exc:  # noqa: BLE001 - network errors are reported and retried
+            wait = 2 ** (attempt + 1)
+            print(f"[WARN] {url}: {exc} (retry in {wait}s)")
+            time.sleep(wait)
+    raise RuntimeError(f"Failed to download {url} after {retries} attempts")
 
-        video_path = find_video_file(folder)
-        if video_path is None:
-            continue
 
-        items.append(
-            VideoItem(
-                folder_name=folder.name,
-                folder_path=folder,
-                video_path=video_path,
-                label=label,
-            )
-        )
+def download(raw_dir: Path, base_url: str, cams: Tuple[str, ...], with_video: bool) -> None:
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    names = [f"{s}.zip" for s in sequence_ids(cams)] + list(LABEL_CSVS)
+    if with_video:
+        # One real video for the end-to-end throughput benchmark.
+        names.append("fall-01-cam0.mp4")
+    manifest_path = raw_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
+    for name in tqdm(names, desc="UR-Fall download", unit="file"):
+        dest = raw_dir / name
+        if not dest.exists():
+            _download(base_url + name, dest)
+        if name not in manifest:
+            manifest[name] = {"url": base_url + name, "sha256": _sha256(dest), "bytes": dest.stat().st_size}
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True))
+    print(f"Downloaded {len(names)} files to {raw_dir}; provenance in {manifest_path}")
 
-    return items
+
+def iter_zip_frames(zip_path: Path) -> Iterator[Tuple[int, np.ndarray]]:
+    """Yield (frame_number, BGR image) in frame order from an official *-rgb.zip archive."""
+    with zipfile.ZipFile(zip_path) as zf:
+        entries = []
+        for info in zf.infolist():
+            m = re.search(r"-(\d+)\.png$", info.filename)
+            if m and not info.is_dir():
+                entries.append((int(m.group(1)), info.filename))
+        entries.sort()
+        for frame_no, name in entries:
+            buf = np.frombuffer(zf.read(name), dtype=np.uint8)
+            img = cv2.imdecode(buf, cv2.IMREAD_COLOR)
+            if img is not None:
+                yield frame_no, img
 
 
 def pick_pose_from_result(result) -> Optional[np.ndarray]:
     """
-    Select one person's keypoints from a YOLOv8-pose result.
-
-    Returns shape (17, 3): [x_px, y_px, keypoint_conf].
+    Select one person's keypoints from a YOLOv8-pose result (highest box confidence,
+    as in the original repo). Returns (17, 3) [x_px, y_px, conf] and (5,) box [x1, y1, x2, y2, conf].
     """
-    if result.keypoints is None or result.boxes is None:
+    if result.keypoints is None or result.boxes is None or len(result.boxes) == 0:
         return None
-
-    xy = result.keypoints.xy
-    if xy is None or len(xy) == 0:
-        return None
-
-    xy_np = xy.detach().cpu().numpy()  # (N, 17, 2)
-    conf_np = None
-    if result.keypoints.conf is not None:
-        conf_np = result.keypoints.conf.detach().cpu().numpy()  # (N, 17)
-
-    boxes_conf = (
-        result.boxes.conf.detach().cpu().numpy()
-        if result.boxes.conf is not None
-        else np.zeros((xy_np.shape[0],), dtype=np.float32)
-    )
-
-    n_person = xy_np.shape[0]
-    if n_person == 0:
-        return None
-
-    # No external annotations in UR-Fall. Keep the highest confidence person.
-    best_idx = int(np.argmax(boxes_conf))
-
-    selected_xy = xy_np[best_idx]  # (17, 2)
-    selected_conf = conf_np[best_idx] if conf_np is not None else np.ones((17,), dtype=np.float32)
-    return np.concatenate([selected_xy, selected_conf[:, None]], axis=1).astype(np.float32)
+    data = result.keypoints.data.detach().cpu().numpy()  # (N, 17, 3)
+    boxes = result.boxes.xyxy.detach().cpu().numpy()
+    conf = result.boxes.conf.detach().cpu().numpy()
+    best = int(np.argmax(conf))
+    return data[best].astype(np.float32), np.concatenate([boxes[best], conf[best:best + 1]]).astype(np.float32)
 
 
-def extract_skeleton_sequence(
-    video_path: Path,
-    model: YOLO,
-    device: str,
-    imgsz: int,
-    conf_thres: float,
-    scale_eps: float,
-) -> np.ndarray:
-    cap = cv2.VideoCapture(str(video_path))
-    if not cap.isOpened():
-        raise RuntimeError(f"Failed to open video: {video_path}")
+def extract_sequence(frames: Iterator[Tuple[int, np.ndarray]], model, device: str, imgsz: int,
+                     conf_thres: float, batch: int = 16) -> Dict[str, np.ndarray]:
+    kpts, boxes, frame_ids = [], [], []
+    width = height = 0
+    buf: List[Tuple[int, np.ndarray]] = []
 
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    if total_frames <= 0:
-        total_frames = 1
+    def flush():
+        results = model.predict(source=[img for _, img in buf], device=device, imgsz=imgsz,
+                                conf=conf_thres, verbose=False)
+        for (fno, _), res in zip(buf, results):
+            picked = pick_pose_from_result(res)
+            frame_ids.append(fno)
+            if picked is None:
+                kpts.append(np.full((17, 3), np.nan, np.float32))
+                boxes.append(np.full((5,), np.nan, np.float32))
+            else:
+                kpts.append(picked[0])
+                boxes.append(picked[1])
+        buf.clear()
 
-    sequence = np.zeros((total_frames, 34), dtype=np.float32)
-
-    frame_idx = 0
-    frame_bar = tqdm(
-        total=total_frames,
-        desc=f"Frames: {video_path.stem}",
-        leave=False,
-        unit="frame",
-    )
-
-    try:
-        while True:
-            ok, frame_bgr = cap.read()
-            if not ok:
-                break
-
-            if frame_idx >= sequence.shape[0]:
-                extra = np.zeros((1, 34), dtype=np.float32)
-                sequence = np.concatenate([sequence, extra], axis=0)
-
-            results = model.predict(
-                source=frame_bgr,
-                device=device,
-                imgsz=imgsz,
-                conf=conf_thres,
-                verbose=False,
-            )
-
-            if results:
-                selected = pick_pose_from_result(results[0])
-                if selected is not None:
-                    # selected: (17, 3) => [x_px, y_px, keypoint_conf]
-                    coco = np.zeros((17, 3), dtype=np.float32)
-                    coco[:, 0] = np.clip(selected[:, 0] / max(width, 1), 0.0, 1.0)
-                    coco[:, 1] = np.clip(selected[:, 1] / max(height, 1), 0.0, 1.0)
-                    coco[:, 2] = np.clip(selected[:, 2], 0.0, 1.0)
-
-                    # Center skeleton around the mid-hip point in x, y.
-                    left_hip = coco[11, :2]
-                    right_hip = coco[12, :2]
-                    mid_hip = (left_hip + right_hip) / 2.0
-                    coco[:, :2] -= mid_hip
-                    apply_unit_scale(coco, eps=scale_eps)
-
-                    # Flatten to (34,): concatenate all x,y coordinates
-                    sequence[frame_idx] = coco[:, :2].flatten()
-
-            frame_idx += 1
-            frame_bar.update(1)
-    finally:
-        frame_bar.close()
-        cap.release()
-
-    if frame_idx < sequence.shape[0]:
-        sequence = sequence[:frame_idx]
-
-    return sequence
+    for fno, img in frames:
+        height, width = img.shape[:2]
+        buf.append((fno, img))
+        if len(buf) >= batch:
+            flush()
+    if buf:
+        flush()
+    return {
+        "kpts": np.stack(kpts) if kpts else np.zeros((0, 17, 3), np.float32),
+        "box": np.stack(boxes) if boxes else np.zeros((0, 5), np.float32),
+        "frame_id": np.asarray(frame_ids, dtype=np.int32),
+        "width": np.int32(width),
+        "height": np.int32(height),
+        "fps": np.float32(FPS),
+    }
 
 
-def process_dataset(
-    dataset_root: Path,
-    output_dir: Path,
-    model_path: str,
-    device: str,
-    imgsz: int,
-    conf_thres: float,
-    scale_eps: float,
-    mirror_aug: bool,
-) -> None:
-    items = discover_videos(dataset_root)
-    if not items:
-        print(f"No valid videos found under {dataset_root}")
-        return
+def extract(raw_dir: Path, pose_dir: Path, legacy_dir: Optional[Path], model_path: str, device: str,
+            imgsz: int, conf_thres: float, cams: Tuple[str, ...], mirror_aug: bool) -> None:
+    from ultralytics import YOLO
 
-    print(f"[INFO] Loading YOLO model: {model_path}")
-    print(f"[INFO] Inference device: {device}")
+    pose_dir.mkdir(parents=True, exist_ok=True)
     model = YOLO(model_path)
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-    summary_csv = output_dir / "summary_labels.csv"
-
-    rows: List[List[str]] = []
-
-    video_bar = tqdm(items, desc="Videos", unit="video")
-    for item in video_bar:
-        video_bar.set_postfix_str(item.folder_name)
-        output_path = output_dir / f"{item.folder_name}_skeleton.npy"
-
-        try:
-            skeleton = extract_skeleton_sequence(
-                item.video_path,
-                model=model,
-                device=device,
-                imgsz=imgsz,
-                conf_thres=conf_thres,
-                scale_eps=scale_eps,
-            )
-            np.save(output_path, skeleton)
-
-            rows.append(
-                [
-                    item.folder_name,
-                    str(item.video_path.relative_to(dataset_root)),
-                    str(output_path.relative_to(output_dir)),
-                    str(item.label),
-                    str(skeleton.shape[0]),
-                ]
-            )
-        except Exception as exc:
-            print(f"[ERROR] Failed processing {item.video_path}: {exc}")
+    stems = sequence_ids(cams)
+    for stem in tqdm(stems, desc="YOLOv8-pose extraction", unit="seq"):
+        out = pose_dir / f"{stem}.npz"
+        if out.exists():
             continue
+        zip_path = raw_dir / f"{stem}.zip"
+        if not zip_path.exists():
+            print(f"[WARN] missing archive {zip_path}; run the download step first")
+            continue
+        rec = extract_sequence(iter_zip_frames(zip_path), model, device, imgsz, conf_thres)
+        rec.update(pose_model=np.array(Path(model_path).name), imgsz=np.int32(imgsz),
+                   conf_thres=np.float32(conf_thres), sequence=np.array(sequence_name(stem)))
+        np.savez_compressed(out, **rec)
+        if legacy_dir is not None:
+            legacy_dir.mkdir(parents=True, exist_ok=True)
+            feats = normalize_repo_features(rec["kpts"], int(rec["width"]), int(rec["height"]))
+            np.save(legacy_dir / f"{stem}_skeleton.npy", feats)
+            if mirror_aug:
+                np.save(legacy_dir / f"{stem}_skeleton_mirror.npy", mirror_coco17_sequence(feats))
 
-        if mirror_aug:
-            mirror_output_path = output_dir / f"{item.folder_name}_skeleton_mirror.npy"
+
+def load_frame_labels(raw_dir: Path) -> Dict[str, Dict[int, int]]:
+    """
+    Parse the official per-frame label CSVs (cam0). Column 0 = sequence name ('fall-01'),
+    column 1 = frame number, column 2 = label: -1 not lying, 0 falling (transition), 1 lying on ground.
+    """
+    labels: Dict[str, Dict[int, int]] = {}
+    for name in LABEL_CSVS:
+        path = raw_dir / name
+        if not path.exists():
+            raise FileNotFoundError(f"Missing official label file {path}")
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            parts = [p.strip() for p in line.split(",")]
+            if len(parts) < 3 or not re.match(r"^(fall|adl)-\d+$", parts[0]):
+                continue  # header or malformed row
             try:
-                mirrored = mirror_coco17_sequence(skeleton)
-                np.save(mirror_output_path, mirrored)
-                rows.append(
-                    [
-                        f"{item.folder_name}_mirror",
-                        str(item.video_path.relative_to(dataset_root)),
-                        str(mirror_output_path.relative_to(output_dir)),
-                        str(item.label),
-                        str(mirrored.shape[0]),
-                    ]
-                )
-            except Exception as exc:
-                print(f"[WARN] Failed mirror augmentation for {item.video_path}: {exc}")
-
-    with summary_csv.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["folder_name", "video_relpath", "skeleton_file", "label", "num_frames"])
-        writer.writerows(rows)
-
-    print(f"Saved {len(rows)} skeleton file(s) to {output_dir}")
-    print(f"Saved labels summary to {summary_csv}")
+                frame, lab = int(float(parts[1])), int(float(parts[2]))
+            except ValueError:
+                continue
+            labels.setdefault(parts[0], {})[frame] = lab
+    return labels
 
 
 def main():
-    parser = argparse.ArgumentParser(description="UR-Fall dataset processing.")
-    parser.add_argument("--dataset-root", type=Path, required=True)
-    parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--model", type=str, default="models/yolov8n-pose.pt")
-    parser.add_argument("--device", type=str, default="auto")
-    parser.add_argument("--imgsz", type=int, default=320)
-    parser.add_argument("--conf", type=float, default=0.25)
-    parser.add_argument("--scale-eps", type=float, default=1e-6)
-    parser.add_argument("--mirror-aug", action="store_true")
+    parser = argparse.ArgumentParser(description="UR-Fall dataset download + YOLOv8-pose extraction.")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    d = sub.add_parser("download")
+    d.add_argument("--raw-dir", type=Path, default=Path("dataset/urfall/raw"))
+    d.add_argument("--base-url", type=str, default=BASE_URL)
+    d.add_argument("--cams", nargs="+", default=["cam0"])
+    d.add_argument("--no-video", action="store_true")
+
+    e = sub.add_parser("extract")
+    e.add_argument("--raw-dir", type=Path, default=Path("dataset/urfall/raw"))
+    e.add_argument("--pose-dir", type=Path, default=Path("dataset/urfall/pose"))
+    e.add_argument("--legacy-dir", type=Path, default=Path("dataset/pose_npy"))
+    e.add_argument("--model", type=str, default="models/yolov8n-pose.pt")
+    e.add_argument("--device", type=str, default="cpu")
+    e.add_argument("--imgsz", type=int, default=320)
+    e.add_argument("--conf", type=float, default=0.25)
+    e.add_argument("--cams", nargs="+", default=["cam0"])
+    e.add_argument("--mirror-aug", action="store_true",
+                   help="Also write mirrored legacy .npy files (the protocol mirrors train windows itself).")
     args = parser.parse_args()
 
-    device = str(resolve_device(args.device))
-    process_dataset(
-        dataset_root=args.dataset_root,
-        output_dir=args.output_dir,
-        model_path=args.model,
-        device=device,
-        imgsz=args.imgsz,
-        conf_thres=args.conf,
-        scale_eps=args.scale_eps,
-        mirror_aug=args.mirror_aug,
-    )
+    if args.cmd == "download":
+        download(args.raw_dir, args.base_url, tuple(args.cams), with_video=not args.no_video)
+    else:
+        extract(args.raw_dir, args.pose_dir, args.legacy_dir, args.model, str(resolve_device(args.device)),
+                args.imgsz, args.conf, tuple(args.cams), args.mirror_aug)
 
 
 if __name__ == "__main__":

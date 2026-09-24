@@ -2,6 +2,11 @@
 """
 Comprehensive evaluation script to test multiple hyperparameter combinations
 and gather the best evaluation results for the fall detection model.
+
+LEGACY — kept only because it produced the old "78.75% validation accuracy". Do not use its output:
+it splits files with an unseeded random_split (mirrored copies of a recording can land in both
+train and validation), has no test set, and reports the maximum over epochs and configurations.
+Use `make train` / `make report` (pose_estimation.experiments) instead. See reports/00_audit.md.
 """
 
 import sys

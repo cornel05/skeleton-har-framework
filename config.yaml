@@ -28,3 +28,19 @@ training:
 inference:
   threshold: 0.5
   stride: 16
+
+# Evaluation protocol (reports/results.md). Splits depend only on split_seed.
+protocol:
+  dataset: "urfall-cam0"
+  window_length: 32
+  train_stride: 4        # training windows
+  eval_stride: 8         # validation/test windows (window- and event-level metrics)
+  min_fall_frames: 8     # positive window: >= min(8, |fall interval|) annotated falling frames
+  split_seed: 0
+  seeds: [0, 1, 2]
+  cv_folds: 5
+  test_frac: 0.2
+  val_frac: 0.2
+  mirror_train: true     # mirror augmentation on the training partition only
+  early_stop_metric: "val_pr_auc"
+  threshold_rule: "max_f1"  # decision threshold maximizing F1 on validation windows

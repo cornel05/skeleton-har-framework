@@ -1,0 +1,232 @@
+{
+  "hardware": {
+    "cpu_model": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+    "logical_cpus": "4",
+    "ram_gb": "15.7",
+    "gpu": "none",
+    "os": "Ubuntu 24.04.4 LTS (kernel 6.18.44-fc-v37)",
+    "virtualization": "hypervisor KVM, container docker",
+    "python": "3.11.15",
+    "torch": "2.14.0+cu130",
+    "ultralytics": "8.4.161",
+    "onnxruntime": "1.30.0",
+    "numpy": "1.26.4"
+  },
+  "best_model": "stgcn",
+  "best_model_rule": "highest mean validation F1 on the fixed split (learned models)",
+  "classifier": {
+    "lstm": {
+      "weights": "runs/lstm/fixed0/seed0/model.pt",
+      "params": 25730,
+      "threads_1": {
+        "median_ms": 0.4887640002380067,
+        "p95_ms": 0.6921650498043165,
+        "mean_ms": 0.5240963200261225,
+        "n_runs": 300,
+        "steal_jiffies": 0,
+        "block_medians_ms": [
+          0.4697435001617123,
+          0.4887640002380067,
+          0.5702415000996552
+        ],
+        "threads": 1
+      },
+      "threads_all": {
+        "median_ms": 0.644517999717209,
+        "p95_ms": 1.1013745994659987,
+        "mean_ms": 0.7486944933528624,
+        "n_runs": 300,
+        "steal_jiffies": 1,
+        "block_medians_ms": [
+          0.7325100000343809,
+          0.5585059998338693,
+          0.644517999717209
+        ],
+        "threads": 4
+      }
+    },
+    "gru": {
+      "weights": "runs/gru/fixed0/seed0/model.pt",
+      "params": 19330,
+      "threads_1": {
+        "median_ms": 1.0934174997601076,
+        "p95_ms": 1.5186139496563558,
+        "mean_ms": 1.1635421766823129,
+        "n_runs": 300,
+        "steal_jiffies": 0,
+        "block_medians_ms": [
+          1.0614699999678123,
+          1.0934174997601076,
+          1.1119280002276355
+        ],
+        "threads": 1
+      },
+      "threads_all": {
+        "median_ms": 1.0561909998614283,
+        "p95_ms": 1.583086549817381,
+        "mean_ms": 1.1660211366658284,
+        "n_runs": 300,
+        "steal_jiffies": 4,
+        "block_medians_ms": [
+          1.0515830003896554,
+          1.1942399996769382,
+          1.0561909998614283
+        ],
+        "threads": 4
+      }
+    },
+    "lstm_attention": {
+      "weights": "runs/lstm_attention/fixed0/seed0/model.pt",
+      "params": 29955,
+      "threads_1": {
+        "median_ms": 0.56660450036361,
+        "p95_ms": 0.8984732996395906,
+        "mean_ms": 0.5994826567014874,
+        "n_runs": 300,
+        "steal_jiffies": 0,
+        "block_medians_ms": [
+          0.5740215001424076,
+          0.56427250001434,
+          0.56660450036361
+        ],
+        "threads": 1
+      },
+      "threads_all": {
+        "median_ms": 0.6672869999420072,
+        "p95_ms": 0.8468559004995768,
+        "mean_ms": 0.6910444499832616,
+        "n_runs": 300,
+        "steal_jiffies": 0,
+        "block_medians_ms": [
+          0.6672869999420072,
+          0.6712075000905315,
+          0.6566755000676494
+        ],
+        "threads": 4
+      }
+    },
+    "tcn": {
+      "weights": "runs/tcn/fixed0/seed0/model.pt",
+      "params": 27986,
+      "threads_1": {
+        "median_ms": 0.6574714998350828,
+        "p95_ms": 0.8267564500783924,
+        "mean_ms": 0.6911721900178236,
+        "n_runs": 300,
+        "steal_jiffies": 0,
+        "block_medians_ms": [
+          0.6574714998350828,
+          0.6483160000243515,
+          0.6788379996578442
+        ],
+        "threads": 1
+      },
+      "threads_all": {
+        "median_ms": 0.7258669998009282,
+        "p95_ms": 1.0457952504566495,
+        "mean_ms": 0.7949662600094598,
+        "n_runs": 300,
+        "steal_jiffies": 2,
+        "block_medians_ms": [
+          0.7420414999614877,
+          0.7258669998009282,
+          0.7052085002214881
+        ],
+        "threads": 4
+      }
+    },
+    "stgcn": {
+      "weights": "runs/stgcn/fixed0/seed0/model.pt",
+      "params": 62473,
+      "threads_1": {
+        "median_ms": 2.0500064997577283,
+        "p95_ms": 3.8068587998623116,
+        "mean_ms": 2.3290937000213794,
+        "n_runs": 300,
+        "steal_jiffies": 1,
+        "block_medians_ms": [
+          2.0218360000399116,
+          2.0805875001315144,
+          2.0500064997577283
+        ],
+        "threads": 1
+      },
+      "threads_all": {
+        "median_ms": 1.5642514995306556,
+        "p95_ms": 1.9158385004175218,
+        "mean_ms": 1.6388650599977457,
+        "n_runs": 300,
+        "steal_jiffies": 2,
+        "block_medians_ms": [
+          1.577030499902321,
+          1.5513445005126414,
+          1.5642514995306556
+        ],
+        "threads": 4
+      }
+    }
+  },
+  "onnx": {
+    "model": "stgcn",
+    "weights": "runs/stgcn/fixed0/seed0/model.pt",
+    "onnx_file_mb": 0.259311,
+    "max_abs_diff_vs_torch": 1.1920928955078125e-07,
+    "threads_1": {
+      "median_ms": 0.7064030000947241,
+      "p95_ms": 0.9014611505790531,
+      "mean_ms": 0.75552423331222,
+      "n_runs": 300
+    },
+    "threads_4": {
+      "median_ms": 0.6335690000014438,
+      "p95_ms": 0.8488712505368313,
+      "mean_ms": 0.6212196099871411,
+      "n_runs": 300
+    }
+  },
+  "pose": {
+    "model": "yolov8n-pose.pt",
+    "source": "UR-Fall fall-01-cam0-rgb.zip (640x480)",
+    "device": "cpu",
+    "torch_threads": 4,
+    "runs": {
+      "imgsz_320": {
+        "median_ms": 21.02291699975467,
+        "p95_ms": 25.573316649752083,
+        "mean_ms": 21.837894914246395,
+        "n_runs": 140,
+        "inference_only_median_ms": 19.056459499552147,
+        "steal_jiffies": 10
+      },
+      "imgsz_640": {
+        "median_ms": 50.386601999889535,
+        "p95_ms": 65.95738839978365,
+        "mean_ms": 52.724567149971335,
+        "n_runs": 140,
+        "inference_only_median_ms": 46.927845000027446,
+        "steal_jiffies": 27
+      }
+    },
+    "gpu": "no GPU on this machine: not measured"
+  },
+  "e2e": {
+    "source": "UR-Fall fall-01-cam0-rgb.zip (PNG decode from zip)",
+    "frames": 160,
+    "resolution": "640x480",
+    "pose_imgsz": 320,
+    "classifier": "stgcn",
+    "classifier_weights": "runs/stgcn/fixed0/seed0/model.pt",
+    "window": 32,
+    "stride": 16,
+    "classifier_calls": 9,
+    "total_s": 5.025234877000003,
+    "fps": 31.839307796796522,
+    "ms_per_frame": 31.407717981250016,
+    "decode_ms_per_frame": 6.97061883747665,
+    "pose_ms_per_frame": 24.257609668762825,
+    "features_classifier_ms_per_frame": 0.17008568751748498,
+    "device": "cpu",
+    "torch_threads": 3,
+    "steal_jiffies": 19
+  }
+}
