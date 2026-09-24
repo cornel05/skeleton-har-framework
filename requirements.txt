@@ -1,7 +1,13 @@
-opencv-contrib-python==4.8.1.78
+# Versions pinned to the exact set used for the reported runs (Python 3.11, uv 0.8).
+# torch from PyPI on Linux is the CUDA build; it runs on CPU-only machines unchanged.
+torch==2.14.0
 numpy==1.26.4
-tqdm
-ultralytics>=8.3.0,<9
-pyyaml
-mediapipe==0.10.14
-mediapipe==0.10.14
+opencv-python==4.11.0.86
+ultralytics==8.4.161
+scikit-learn==1.9.1
+pyyaml==6.0.3
+tqdm==4.70.1
+matplotlib==3.11.2
+onnx==1.23.0
+onnxruntime==1.30.0
+pytest==9.1.1

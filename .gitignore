@@ -19,3 +19,9 @@ models/*.onnx
 # OS-specific
 .DS_Store
 Thumbs.db
+
+# Evaluation artefacts
+runs_smoke/
+reports/onnx/
+runs/**/model.pt
+!runs/*/fixed0/seed0/model.pt

@@ -573,21 +573,22 @@ def compute_inference_time(
     model.eval()
     
     times = []
+    masks = torch.ones(input_shape[:2], device=device)  # models take (sequences, masks)
     with torch.no_grad():
         # Warmup
         for _ in range(10):
             x = torch.randn(input_shape, device=device)
-            _ = model(x)
+            _ = model(x, masks)
         
         # Measurement
         for _ in range(num_runs):
             x = torch.randn(input_shape, device=device)
             
             torch.cuda.synchronize() if device.type == 'cuda' else None
-            start = time.time()
-            _ = model(x)
+            start = time.perf_counter()
+            _ = model(x, masks)
             torch.cuda.synchronize() if device.type == 'cuda' else None
-            end = time.time()
+            end = time.perf_counter()
             
             times.append((end - start) * 1000)  # Convert to ms
     

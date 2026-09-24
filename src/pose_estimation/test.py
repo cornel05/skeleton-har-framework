@@ -14,13 +14,13 @@ import torch.nn as nn
 
 try:
     from .dataset import SkeletonDataset
-    from .model import SkeletonLSTM, SkeletonLSTMWithAttention
+    from .model import SkeletonLSTM, SkeletonLSTMWithAttention, build_model
     from .config import DATASET_CFG, MODEL_CFG, INFERENCE_CFG, TRAINING_CFG
-    from .preprocessing.common import unit_scale_sequence
+    from .features import normalize_repo_features
 except ImportError:
     from dataset import SkeletonDataset
-    from model import SkeletonLSTM, SkeletonLSTMWithAttention
-    from preprocessing.common import unit_scale_sequence
+    from model import SkeletonLSTM, SkeletonLSTMWithAttention, build_model
+    from features import normalize_repo_features
     try:
         from config import DATASET_CFG, MODEL_CFG, INFERENCE_CFG, TRAINING_CFG
     except ImportError:
@@ -30,164 +30,77 @@ except ImportError:
         TRAINING_CFG = {}
 
 
-MEDIAPIPE_TO_COCO17 = [
-    0,   # nose
-    2,   # left eye
-    5,   # right eye
-    7,   # left ear
-    8,   # right ear
-    11,  # left shoulder
-    12,  # right shoulder
-    13,  # left elbow
-    14,  # right elbow
-    15,  # left wrist
-    16,  # right wrist
-    23,  # left hip
-    24,  # right hip
-    25,  # left knee
-    26,  # right knee
-    27,  # left ankle
-    28,  # right ankle
-]
+DEFAULT_POSE_MODEL = "models/yolov8n-pose.pt"
+IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".bmp", ".webp")
 
 
-def _normalize_sequence_like_training(sequence_xy: np.ndarray) -> np.ndarray:
-    """Match UR-Fall training preprocessing: COCO17 subset, centering, and unit scaling."""
-    if sequence_xy.size == 0:
-        return sequence_xy.astype(np.float32)
-
-    if sequence_xy.ndim != 3 or sequence_xy.shape[1:] != (17, 2):
-        raise ValueError(f"Expected sequence shape (T, 17, 2), got {sequence_xy.shape}")
-
-    normalized = sequence_xy.astype(np.float32, copy=True)
-    mid_hip = (normalized[:, 11, :] + normalized[:, 12, :]) / 2.0
-    normalized[:, :, :2] -= mid_hip[:, None, :]
-    normalized = unit_scale_sequence(normalized, eps=1e-6)
-    return normalized.reshape(normalized.shape[0], 34)
-
-
-def _extract_mediapipe_keypoints_from_video(
-    video_path: str
-) -> Tuple[np.ndarray, float, int, int]:
+def _yolo_keypoints(frames, pose_model_path: str, imgsz: int = 320, conf: float = 0.25):
     """
-    Extract 2D pose keypoints per frame from a video using MediaPipe Pose.
+    Run YOLOv8-pose on an iterable of BGR frames exactly as the training-data extraction does
+    (highest-confidence person, same imgsz/conf) and return raw (T, 17, 3) keypoints (NaN = no person).
     """
+    from ultralytics import YOLO
     try:
-        import cv2  # type: ignore
-        import mediapipe as mp  # type: ignore
-        if not hasattr(mp, "solutions"):
-             raise ImportError(
-                "Installed Mediapipe does not expose 'mediapipe.solutions'. "
-                "Please install a compatible version: pip install mediapipe==0.10.14"
-            )
-    except ImportError as exc:
-        raise ImportError(
-            f"Video inference error: {exc}. "
-            "Ensure opencv-python and a compatible mediapipe (e.g. 0.10.14) are installed."
-        ) from exc
+        from .preprocessing.urfall import pick_pose_from_result
+    except ImportError:
+        from preprocessing.urfall import pick_pose_from_result
+
+    model = YOLO(pose_model_path)
+    kpts, width, height, total = [], 0, 0, 0
+    for frame in frames:
+        total += 1
+        height, width = frame.shape[:2]
+        picked = pick_pose_from_result(model.predict(frame, imgsz=imgsz, conf=conf, device="cpu", verbose=False)[0])
+        kpts.append(picked[0] if picked is not None else np.full((17, 3), np.nan, np.float32))
+    arr = np.stack(kpts) if kpts else np.zeros((0, 17, 3), np.float32)
+    return arr, width, height, total
+
+
+def _features_from_frames(frames, pose_model_path: str) -> Tuple[np.ndarray, int, int]:
+    kpts, width, height, total = _yolo_keypoints(frames, pose_model_path)
+    valid = int((~np.isnan(kpts[:, 0, 0])).sum()) if len(kpts) else 0
+    if valid == 0:
+        return np.zeros((0, 34), np.float32), total, 0
+    return normalize_repo_features(kpts, width, height), total, valid
+
+
+def _extract_keypoints_from_video(video_path: str, pose_model_path: str = DEFAULT_POSE_MODEL
+                                  ) -> Tuple[np.ndarray, float, int, int]:
+    """Per-frame 34-d features for a video file (YOLOv8-pose, same normalization as training)."""
+    import cv2
 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise FileNotFoundError(f"Could not open video: {video_path}")
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
 
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    if fps is None or fps <= 0:
-        fps = 30.0
-
-    mp_pose = mp.solutions.pose
-    sequence: List[np.ndarray] = []
-    total_frames = 0
-
-    with mp_pose.Pose() as pose:
+    def frames():
         while True:
             ok, frame = cap.read()
             if not ok:
                 break
+            yield frame
+        cap.release()
 
-            total_frames += 1
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            result = pose.process(frame_rgb)
-
-            if result.pose_landmarks:
-                all_landmarks = result.pose_landmarks.landmark
-                coco17_xy = np.asarray(
-                    [[all_landmarks[idx].x, all_landmarks[idx].y] for idx in MEDIAPIPE_TO_COCO17],
-                    dtype=np.float32,
-                )
-                sequence.append(coco17_xy)
-
-    cap.release()
-
-    if not sequence:
-        return np.zeros((0, 0), dtype=np.float32), float(fps), total_frames, 0
-
-    keypoints_array = np.stack(sequence, axis=0).astype(np.float32)
-    keypoints_array = _normalize_sequence_like_training(keypoints_array)
-    return keypoints_array, float(fps), total_frames, len(sequence)
+    feats, total, valid = _features_from_frames(frames(), pose_model_path)
+    return feats, float(fps), total, valid
 
 
-def _extract_mediapipe_keypoints_from_image_stream(
-    folder_path: str,
-    fps: float = 30.0
-) -> Tuple[np.ndarray, float, int, int]:
-    """
-    Extract 2D pose keypoints from a sequence of images in a folder.
-    """
-    try:
-        import cv2  # type: ignore
-        import mediapipe as mp  # type: ignore
-        if not hasattr(mp, "solutions"):
-             raise ImportError(
-                "Installed Mediapipe does not expose 'mediapipe.solutions'. "
-                "Please install a compatible version: pip install mediapipe==0.10.14"
-            )
-    except ImportError as exc:
-        raise ImportError(
-            f"Image stream inference error: {exc}. "
-            "Ensure opencv-python and a compatible mediapipe (e.g. 0.10.14) are installed."
-        ) from exc
+def _extract_keypoints_from_image_stream(folder_path: str, fps: float = 30.0,
+                                         pose_model_path: str = DEFAULT_POSE_MODEL
+                                         ) -> Tuple[np.ndarray, float, int, int]:
+    """Per-frame 34-d features for a folder of images sorted by name."""
+    import cv2
 
     folder = Path(folder_path)
     if not folder.is_dir():
         raise FileNotFoundError(f"Image folder not found: {folder_path}")
-
-    # Support common image extensions
-    valid_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.webp')
-    image_files = sorted([
-        f for f in folder.iterdir() 
-        if f.suffix.lower() in valid_extensions
-    ])
-
-    if not image_files:
+    files = sorted(f for f in folder.iterdir() if f.suffix.lower() in IMAGE_EXTENSIONS)
+    if not files:
         raise ValueError(f"No images found in: {folder_path}")
-
-    mp_pose = mp.solutions.pose
-    sequence: List[np.ndarray] = []
-    total_frames = len(image_files)
-
-    with mp_pose.Pose() as pose:
-        for img_path in image_files:
-            frame = cv2.imread(str(img_path))
-            if frame is None:
-                continue
-
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            result = pose.process(frame_rgb)
-
-            if result.pose_landmarks:
-                all_landmarks = result.pose_landmarks.landmark
-                coco17_xy = np.asarray(
-                    [[all_landmarks[idx].x, all_landmarks[idx].y] for idx in MEDIAPIPE_TO_COCO17],
-                    dtype=np.float32,
-                )
-                sequence.append(coco17_xy)
-
-    if not sequence:
-        return np.zeros((0, 0), dtype=np.float32), float(fps), total_frames, 0
-
-    keypoints_array = np.stack(sequence, axis=0).astype(np.float32)
-    keypoints_array = _normalize_sequence_like_training(keypoints_array)
-    return keypoints_array, float(fps), total_frames, len(sequence)
+    frames = (img for img in (cv2.imread(str(f)) for f in files) if img is not None)
+    feats, total, valid = _features_from_frames(frames, pose_model_path)
+    return feats, float(fps), total, valid
 
 
 def _load_checkpoint_safely(checkpoint_path: str, device: torch.device) -> Dict[str, Any]:
@@ -236,6 +149,13 @@ def load_model_for_inference(
     loaded = _load_checkpoint_safely(checkpoint_path, device)
     state_dict = loaded["state_dict"]
 
+    if "lstm.weight_ih_l0" not in state_dict:  # GRU / TCN / ST-GCN checkpoints from the evaluation protocol
+        kind = "gru" if "gru.weight_ih_l0" in state_dict else "stgcn" if any(
+            k.startswith("blocks.") for k in state_dict) else "tcn"
+        model = build_model(kind, input_dim=34)
+        model.load_state_dict(state_dict, strict=True)
+        return model.to(device).eval()
+
     model_config = _infer_model_config_from_state_dict(state_dict)
     uses_attention = any(k.startswith("attention.") for k in state_dict.keys())
 
@@ -272,7 +192,8 @@ def predict_fall(
     threshold: float = INFERENCE_CFG.get("threshold", 0.5),
     stride: Optional[int] = INFERENCE_CFG.get("stride", 16),
     device: Optional[torch.device] = None,
-    fps: float = 30.0
+    fps: float = 30.0,
+    pose_model_path: str = DEFAULT_POSE_MODEL,
 ) -> Dict[str, Any]:
     """
     Run offline fall detection on a video or an image folder.
@@ -287,9 +208,11 @@ def predict_fall(
         stride = max(1, sequence_length // 2)
 
     if is_image_stream:
-        sequence, fps, total_frames, valid_pose_frames = _extract_mediapipe_keypoints_from_image_stream(source_path, fps=fps)
+        sequence, fps, total_frames, valid_pose_frames = _extract_keypoints_from_image_stream(
+            source_path, fps=fps, pose_model_path=pose_model_path)
     else:
-        sequence, fps, total_frames, valid_pose_frames = _extract_mediapipe_keypoints_from_video(source_path)
+        sequence, fps, total_frames, valid_pose_frames = _extract_keypoints_from_video(
+            source_path, pose_model_path=pose_model_path)
 
     if valid_pose_frames == 0:
         return {
@@ -300,7 +223,7 @@ def predict_fall(
             "fps": fps,
             "total_frames": total_frames,
             "valid_pose_frames": 0,
-            "note": "No pose landmarks detected in source.",
+            "note": "No person detected in source.",
         }
 
     input_dim = int(model.input_dim) if hasattr(model, "input_dim") else sequence.shape[1]
@@ -397,6 +320,12 @@ if __name__ == "__main__":
         help="Sliding-window stride for inference.",
     )
     parser.add_argument(
+        "--pose-model",
+        type=str,
+        default=DEFAULT_POSE_MODEL,
+        help="YOLOv8-pose weights (must match the extractor used for training data).",
+    )
+    parser.add_argument(
         "--fps",
         type=float,
         default=30.0,
@@ -422,7 +351,8 @@ if __name__ == "__main__":
         threshold=args.threshold,
         stride=args.stride,
         device=device,
-        fps=args.fps
+        fps=args.fps,
+        pose_model_path=args.pose_model,
     )
 
     print("=== Inference Result ===")

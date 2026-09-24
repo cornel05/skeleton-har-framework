@@ -393,3 +393,183 @@ class SkeletonLSTMWithAttention(SkeletonLSTM):
         attended_output = torch.stack(attended_outputs, dim=0)
         
         return attended_output
+
+
+class SkeletonGRU(nn.Module):
+    """GRU counterpart of SkeletonLSTM (same hidden size / layers, last valid output -> linear)."""
+
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_size: int = MODEL_CFG.get("hidden_size", 64),
+        num_layers: int = MODEL_CFG.get("num_layers", 1),
+        dropout: float = MODEL_CFG.get("dropout", 0.2),
+        num_classes: int = MODEL_CFG.get("num_classes", 2),
+        bidirectional: bool = MODEL_CFG.get("bidirectional", False),
+    ):
+        super().__init__()
+        self.input_dim = input_dim
+        self.num_classes = num_classes
+        out = hidden_size * (2 if bidirectional else 1)
+        self.gru = nn.GRU(input_dim, hidden_size, num_layers=num_layers, batch_first=True,
+                          dropout=dropout if num_layers > 1 else 0.0, bidirectional=bidirectional)
+        self.classifier = nn.Linear(out, num_classes)
+
+    def forward(self, sequences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
+        lengths = torch.clamp(masks.sum(dim=1).long(), min=1)
+        packed = pack_padded_sequence(sequences, lengths.cpu(), batch_first=True, enforce_sorted=False)
+        output, _ = pad_packed_sequence(self.gru(packed)[0], batch_first=True)
+        last = output[torch.arange(output.shape[0], device=output.device), lengths - 1]
+        return self.classifier(last)
+
+    def predict(self, sequences, masks):
+        with torch.no_grad():
+            probs = torch.softmax(self.forward(sequences, masks), dim=1)
+        return probs.argmax(dim=1), probs
+
+
+class _TemporalBlock(nn.Module):
+    def __init__(self, c_in: int, c_out: int, kernel: int, dilation: int, dropout: float):
+        super().__init__()
+        pad = (kernel - 1) // 2 * dilation
+        self.conv = nn.Conv1d(c_in, c_out, kernel, padding=pad, dilation=dilation)
+        self.norm = nn.BatchNorm1d(c_out)
+        self.drop = nn.Dropout(dropout)
+        self.skip = nn.Conv1d(c_in, c_out, 1) if c_in != c_out else nn.Identity()
+
+    def forward(self, x):
+        return torch.relu(self.skip(x) + self.drop(torch.relu(self.norm(self.conv(x)))))
+
+
+class SkeletonTCN(nn.Module):
+    """Small non-causal dilated 1D-CNN over time (receptive field 31 frames), masked mean pooling."""
+
+    def __init__(self, input_dim: int, channels: int = 48, kernel: int = 3,
+                 dilations=(1, 2, 4, 8), dropout: float = 0.2, num_classes: int = 2):
+        super().__init__()
+        self.input_dim = input_dim
+        self.num_classes = num_classes
+        layers, c = [], input_dim
+        for d in dilations:
+            layers.append(_TemporalBlock(c, channels, kernel, d, dropout))
+            c = channels
+        self.net = nn.Sequential(*layers)
+        self.classifier = nn.Linear(channels, num_classes)
+
+    def forward(self, sequences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
+        h = self.net((sequences * masks.unsqueeze(-1)).transpose(1, 2))  # (B, C, T)
+        m = masks.unsqueeze(1)
+        pooled = (h * m).sum(dim=2) / m.sum(dim=2).clamp(min=1.0)
+        return self.classifier(pooled)
+
+    def predict(self, sequences, masks):
+        with torch.no_grad():
+            probs = torch.softmax(self.forward(sequences, masks), dim=1)
+        return probs.argmax(dim=1), probs
+
+
+COCO17_EDGES = [(0, 1), (0, 2), (1, 3), (2, 4), (5, 6), (5, 7), (7, 9), (6, 8), (8, 10), (5, 11),
+                (6, 12), (11, 12), (11, 13), (13, 15), (12, 14), (14, 16), (0, 5), (0, 6)]
+
+
+class _STGCNBlock(nn.Module):
+    def __init__(self, c_in: int, c_out: int, A: torch.Tensor, t_kernel: int, dropout: float):
+        super().__init__()
+        self.register_buffer("A", A)
+        self.edge_importance = nn.Parameter(torch.ones_like(A))
+        self.gcn = nn.Conv2d(c_in, c_out, 1)
+        self.tcn = nn.Sequential(
+            nn.BatchNorm2d(c_out), nn.ReLU(),
+            nn.Conv2d(c_out, c_out, (t_kernel, 1), padding=((t_kernel - 1) // 2, 0)),
+            nn.BatchNorm2d(c_out), nn.Dropout(dropout),
+        )
+        self.skip = nn.Conv2d(c_in, c_out, 1) if c_in != c_out else nn.Identity()
+
+    def forward(self, x):  # x: (B, C, T, V)
+        g = torch.einsum("bctv,vw->bctw", self.gcn(x), self.A * self.edge_importance)
+        return torch.relu(self.tcn(g) + self.skip(x))
+
+
+class SkeletonSTGCN(nn.Module):
+    """Small ST-GCN (single-partition normalized COCO-17 graph, 3 blocks)."""
+
+    def __init__(self, input_dim: int = 34, channels=(32, 32, 64), t_kernel: int = 9,
+                 dropout: float = 0.2, num_classes: int = 2, num_joints: int = 17):
+        super().__init__()
+        assert input_dim == num_joints * 2, "ST-GCN expects (x, y) per COCO-17 joint"
+        self.input_dim = input_dim
+        self.num_classes = num_classes
+        self.num_joints = num_joints
+        A = torch.eye(num_joints)
+        for i, j in COCO17_EDGES:
+            A[i, j] = A[j, i] = 1.0
+        d = A.sum(dim=1).pow(-0.5)
+        A = d[:, None] * A * d[None, :]
+        self.data_bn = nn.BatchNorm1d(input_dim)
+        blocks, c = [], 2
+        for c_out in channels:
+            blocks.append(_STGCNBlock(c, c_out, A.clone(), t_kernel, dropout))
+            c = c_out
+        self.blocks = nn.Sequential(*blocks)
+        self.classifier = nn.Linear(c, num_classes)
+
+    def forward(self, sequences: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
+        B, T, _ = sequences.shape
+        x = self.data_bn((sequences * masks.unsqueeze(-1)).transpose(1, 2)).transpose(1, 2)
+        x = x.reshape(B, T, self.num_joints, 2).permute(0, 3, 1, 2)  # (B, 2, T, V)
+        h = self.blocks(x).mean(dim=3)                                # (B, C, T)
+        m = masks.unsqueeze(1)
+        pooled = (h * m).sum(dim=2) / m.sum(dim=2).clamp(min=1.0)
+        return self.classifier(pooled)
+
+    def predict(self, sequences, masks):
+        with torch.no_grad():
+            probs = torch.softmax(self.forward(sequences, masks), dim=1)
+        return probs.argmax(dim=1), probs
+
+
+MODEL_NAMES = ("lstm", "lstm_attention", "gru", "tcn", "stgcn")
+
+
+def build_model(name: str, input_dim: int = 34, cfg: Optional[dict] = None) -> nn.Module:
+    """Factory used by the evaluation protocol. Recurrent models use the repo config sizes."""
+    cfg = dict(MODEL_CFG if cfg is None else cfg)
+    rnn = dict(hidden_size=cfg.get("hidden_size", 64), num_layers=cfg.get("num_layers", 1),
+               dropout=cfg.get("dropout", 0.2), num_classes=cfg.get("num_classes", 2),
+               bidirectional=cfg.get("bidirectional", False))
+    if name == "lstm":
+        return SkeletonLSTM(input_dim=input_dim, **rnn)
+    if name == "lstm_attention":
+        return SkeletonLSTMWithAttention(input_dim=input_dim, attention_context=cfg.get("attention_context", 5), **rnn)
+    if name == "gru":
+        return SkeletonGRU(input_dim=input_dim, **rnn)
+    if name == "tcn":
+        return SkeletonTCN(input_dim=input_dim, dropout=cfg.get("dropout", 0.2), num_classes=rnn["num_classes"])
+    if name == "stgcn":
+        return SkeletonSTGCN(input_dim=input_dim, dropout=cfg.get("dropout", 0.2), num_classes=rnn["num_classes"])
+    raise ValueError(f"Unknown model '{name}'. Choose from {MODEL_NAMES}")
+
+
+class FullWindowExport(nn.Module):
+    """
+    ONNX-friendly wrapper for full-length windows (mask of ones), which is the only case
+    the sliding-window inference produces. Avoids pack_padded_sequence during export.
+    """
+
+    def __init__(self, model: nn.Module):
+        super().__init__()
+        self.model = model
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        m = self.model
+        if isinstance(m, SkeletonLSTMWithAttention):
+            out, _ = m.lstm(x)
+            ctx = out[:, -m.attention_context:, :]
+            w = torch.softmax(m.attention(ctx), dim=1)
+            return torch.softmax(m.classifier((ctx * w).sum(dim=1)), dim=1)
+        if isinstance(m, SkeletonLSTM):
+            return torch.softmax(m.classifier(m.lstm(x)[0][:, -1]), dim=1)
+        if isinstance(m, SkeletonGRU):
+            return torch.softmax(m.classifier(m.gru(x)[0][:, -1]), dim=1)
+        ones = torch.ones(x.shape[0], x.shape[1], dtype=x.dtype, device=x.device)
+        return torch.softmax(m(x, ones), dim=1)

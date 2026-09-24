@@ -1,0 +1,215 @@
+{
+  "hardware": {
+    "cpu_model": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+    "logical_cpus": "4",
+    "ram_gb": "15.7",
+    "gpu": "none",
+    "os": "Ubuntu 24.04.4 LTS (kernel 6.18.44-fc-v37)",
+    "virtualization": "hypervisor KVM, container docker",
+    "python": "3.11.15",
+    "torch": "2.14.0+cu130",
+    "ultralytics": "8.4.161",
+    "onnxruntime": "1.30.0",
+    "numpy": "1.26.4"
+  },
+  "best_model": "lstm",
+  "best_model_rule": "no runs found: defaulted to the repo's LSTM",
+  "classifier": {
+    "lstm": {
+      "weights": "random init (latency only)",
+      "params": 25730,
+      "threads_1": {
+        "median_ms": 0.4867720000447662,
+        "p95_ms": 0.6033704498349836,
+        "mean_ms": 0.49906708665578964,
+        "n_runs": 300,
+        "steal_jiffies": 0,
+        "block_medians_ms": [
+          0.48758050002106756,
+          0.4815894999410375,
+          0.4867720000447662
+        ],
+        "threads": 1
+      },
+      "threads_all": {
+        "median_ms": 0.5852085000697116,
+        "p95_ms": 0.9358463498756464,
+        "mean_ms": 0.6767877466601627,
+        "n_runs": 300,
+        "steal_jiffies": 2,
+        "block_medians_ms": [
+          0.6015089999209522,
+          0.5852085000697116,
+          0.5331200001137404
+        ],
+        "threads": 4
+      }
+    },
+    "gru": {
+      "weights": "random init (latency only)",
+      "params": 19330,
+      "threads_1": {
+        "median_ms": 1.0219290001032277,
+        "p95_ms": 1.6061380999985886,
+        "mean_ms": 1.1013524033205613,
+        "n_runs": 300,
+        "steal_jiffies": 0,
+        "block_medians_ms": [
+          1.0765555000489258,
+          1.016011999922739,
+          1.0219290001032277
+        ],
+        "threads": 1
+      },
+      "threads_all": {
+        "median_ms": 1.1262379999834593,
+        "p95_ms": 1.8343832501045656,
+        "mean_ms": 1.2553368800043547,
+        "n_runs": 300,
+        "steal_jiffies": 2,
+        "block_medians_ms": [
+          1.1633845000460497,
+          1.0791439999593422,
+          1.1262379999834593
+        ],
+        "threads": 4
+      }
+    },
+    "lstm_attention": {
+      "weights": "random init (latency only)",
+      "params": 29955,
+      "threads_1": {
+        "median_ms": 0.601311999957943,
+        "p95_ms": 0.9536822500308518,
+        "mean_ms": 0.653729983333354,
+        "n_runs": 300,
+        "steal_jiffies": 1,
+        "block_medians_ms": [
+          0.601311999957943,
+          0.5882809999775418,
+          0.6023464999316275
+        ],
+        "threads": 1
+      },
+      "threads_all": {
+        "median_ms": 0.7653540000092107,
+        "p95_ms": 1.2037692999797407,
+        "mean_ms": 0.8455428400058432,
+        "n_runs": 300,
+        "steal_jiffies": 2,
+        "block_medians_ms": [
+          0.7449630001019614,
+          0.7653540000092107,
+          0.8085265000090658
+        ],
+        "threads": 4
+      }
+    },
+    "tcn": {
+      "weights": "random init (latency only)",
+      "params": 27986,
+      "threads_1": {
+        "median_ms": 0.6812070000705717,
+        "p95_ms": 0.8550628001671612,
+        "mean_ms": 0.703934313329834,
+        "n_runs": 300,
+        "steal_jiffies": 0,
+        "block_medians_ms": [
+          0.6812070000705717,
+          0.675242500051354,
+          0.7559494999895833
+        ],
+        "threads": 1
+      },
+      "threads_all": {
+        "median_ms": 0.7382420000112688,
+        "p95_ms": 0.9574713998858897,
+        "mean_ms": 0.785153776663113,
+        "n_runs": 300,
+        "steal_jiffies": 1,
+        "block_medians_ms": [
+          0.7436644999643249,
+          0.7320934998915618,
+          0.7382420000112688
+        ],
+        "threads": 4
+      }
+    },
+    "stgcn": {
+      "weights": "random init (latency only)",
+      "params": 62473,
+      "threads_1": {
+        "median_ms": 2.0941999999877225,
+        "p95_ms": 2.608555550034453,
+        "mean_ms": 2.178931016662015,
+        "n_runs": 300,
+        "steal_jiffies": 1,
+        "block_medians_ms": [
+          2.0941999999877225,
+          2.095724000014343,
+          2.030946999866501
+        ],
+        "threads": 1
+      },
+      "threads_all": {
+        "median_ms": 1.6239879998920514,
+        "p95_ms": 2.293007600030706,
+        "mean_ms": 1.7137484399950154,
+        "n_runs": 300,
+        "steal_jiffies": 1,
+        "block_medians_ms": [
+          1.6239879998920514,
+          1.7097245000741168,
+          1.4488440000377523
+        ],
+        "threads": 4
+      }
+    }
+  },
+  "onnx": {
+    "model": "lstm",
+    "weights": "random init",
+    "onnx_file_mb": 0.106096,
+    "max_abs_diff_vs_torch": 0.0,
+    "threads_1": {
+      "median_ms": 0.07657599996946374,
+      "p95_ms": 0.14067144993532565,
+      "mean_ms": 0.08585477665974395,
+      "n_runs": 300
+    },
+    "threads_4": {
+      "median_ms": 0.10217049998573202,
+      "p95_ms": 0.15092900015361013,
+      "mean_ms": 0.11069395667012334,
+      "n_runs": 300
+    }
+  },
+  "pose": {
+    "model": "yolov8n-pose.pt",
+    "source": "PROXY: ultralytics sample images resized to 640x480 (dataset frames unavailable)",
+    "device": "cpu",
+    "torch_threads": 4,
+    "runs": {
+      "imgsz_320": {
+        "median_ms": 24.537194499998805,
+        "p95_ms": 34.45043835014303,
+        "mean_ms": 25.978598375007778,
+        "n_runs": 200,
+        "inference_only_median_ms": 22.425168500035397,
+        "steal_jiffies": 34
+      },
+      "imgsz_640": {
+        "median_ms": 57.625938499995755,
+        "p95_ms": 76.7928974000597,
+        "mean_ms": 59.77594358500369,
+        "n_runs": 200,
+        "inference_only_median_ms": 54.35950650007726,
+        "steal_jiffies": 66
+      }
+    },
+    "gpu": "no GPU on this machine: not measured"
+  },
+  "e2e": {
+    "source": "dataset video unavailable: not measured"
+  }
+}
