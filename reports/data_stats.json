@@ -16,6 +16,10 @@
     "max": 400
   },
   "no_person_detected_frame_rate": 0.15859584450402145,
+  "no_person_detected_frame_rate_by_class": {
+    "fall_videos": 0.04106844741235392,
+    "adl_videos": 0.19796443350855608
+  },
   "fall_interval_frames": {
     "min": 30,
     "median": 30.0,

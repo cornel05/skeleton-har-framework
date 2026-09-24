@@ -83,7 +83,7 @@ def _frames(raw_dir: Path, n: int) -> Tuple[List[np.ndarray], str]:
     """Real dataset frames if available, else ultralytics' bundled sample images at 640x480."""
     zips = sorted(raw_dir.glob("fall-*-cam0-rgb.zip"))
     if zips:
-        frames = [img for _, img in zip(range(n), iter_zip_frames(zips[0]))]
+        frames = [img for _, (_, img) in zip(range(n), iter_zip_frames(zips[0]))]
         return frames, f"UR-Fall {zips[0].name} ({frames[0].shape[1]}x{frames[0].shape[0]})"
     import cv2
     import ultralytics
@@ -199,19 +199,10 @@ def bench_onnx(runs_dir: Path, name: str, out_dir: Path) -> dict:
 
 
 def _video_frames(raw_dir: Path) -> Tuple[Optional[Iterator[np.ndarray]], str]:
-    import cv2
-    mp4 = raw_dir / "fall-01-cam0.mp4"
-    if mp4.exists():
-        cap = cv2.VideoCapture(str(mp4))
-
-        def gen():
-            while True:
-                ok, f = cap.read()
-                if not ok:
-                    break
-                yield f
-            cap.release()
-        return gen(), f"UR-Fall {mp4.name} (mp4 decode)"
+    """
+    The official RGB frame archive is the model's real input (640x480). The official `*-cam0.mp4`
+    is a 640x240 depth+RGB side-by-side preview, so it is NOT used for throughput.
+    """
     zips = sorted(raw_dir.glob("fall-01-cam0-rgb.zip"))
     if zips:
         return (img for _, img in iter_zip_frames(zips[0])), f"UR-Fall {zips[0].name} (PNG decode from zip)"
@@ -232,7 +223,10 @@ def bench_e2e(model_path: str, raw_dir: Path, runs_dir: Path, name: str, imgsz: 
     if ckpt:
         clf.load_state_dict(torch.load(ckpt, map_location="cpu"))
     clf.eval()
-    buf_k, buf_b = [], []
+    warm = next(iter_zip_frames(sorted(raw_dir.glob("fall-01-cam0-rgb.zip"))[0]))[1]
+    for _ in range(5):  # warm-up, excluded from timing
+        pose.predict(warm, imgsz=imgsz, device="cpu", verbose=False)
+    buf_k = []
     t_dec = t_pose = t_clf = 0.0
     n = n_clf = 0
     h = w = 0

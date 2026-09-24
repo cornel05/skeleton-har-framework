@@ -114,6 +114,28 @@ def render(res: dict) -> str:
     else:
         L += [f"**{NM}**.", ""]
 
+    if any("fixed" in e for e in models.values()):
+        L += ["### Model cost and training time", "",
+              "Training on 1 CPU thread per run (4 runs in parallel on the 4 vCPUs); fixed split, mean ± std over seeds.", "",
+              "| model | params | size MB (fp32 state_dict) | train time s | epochs run |", "|---|---|---|---|---|"]
+        for m in ORDER:
+            e = models.get(m)
+            if e and "fixed" in e:
+                L.append(f"| {PRETTY[m]} | {e['params']:,} | {e['size_mb']:.3f} | {_f(e['train_time_s_fixed'], 1)} | "
+                         f"{_f(e['epochs_run_fixed'], 1)} |")
+        L += [""]
+    cvm = {m: e["cv"] for m, e in models.items() if "cv" in e}
+    if cvm:
+        top_pr = max(cvm, key=lambda m: cvm[m]["pr_auc"]["mean"])
+        top_f1 = max(cvm, key=lambda m: cvm[m]["f1"]["mean"])
+        L += ["### Reading the two tables", "",
+              f"* Under 5-fold CV the highest PR-AUC is **{PRETTY[top_pr]}** ({_f(cvm[top_pr]['pr_auc'])}) and the highest F1 is "
+              f"**{PRETTY[top_f1]}** ({_f(cvm[top_f1]['f1'])}). "
+              + ("The non-learned rule is not beaten by any learned model on PR-AUC. " if top_pr == "rule" else "")
+              + "Differences between the top models are within about one standard deviation.",
+              "* The fixed test split (6 fall videos) scores clearly higher than CV for most models; it is one easy draw of "
+              "14 videos. The CV numbers are the more reliable estimate.", ""]
+
     best = res.get("best_model", {}).get("name")
     L += ["## 6. Confusion matrix of the best model (fixed test windows)", ""]
     if best and best in models and "fixed" in models[best]:
@@ -177,6 +199,12 @@ def render(res: dict) -> str:
           "5. **Task definition differs.** This evaluation scores 32-frame windows against the annotated fall interval and "
           "whole videos (event recall, false alarms), on unseen videos only.", "",
           "The new numbers answer a different, harder question; a lower number here is not a regression.", "",
+          ] + ([
+          f"For reference, the repo's own LSTM configuration under this protocol: window accuracy "
+          f"{_f(models['lstm']['fixed']['accuracy'])} (fixed test) / {_f(models['lstm']['cv']['accuracy'])} (CV), "
+          f"but fall-class F1 {_f(models['lstm']['fixed']['f1'])} / {_f(models['lstm']['cv']['f1'])}. Accuracy looks "
+          f"high only because ~88% of windows are non-fall.", ""] if "lstm" in models and "cv" in models["lstm"] else []) + [
+
           "## 9. Limitations", "",
           f"* Small dataset: {data['videos'] if data else 70} cam0 videos, {data['fall_videos'] if data else 30} falls; the fixed "
           f"test split holds only {data['fixed_split']['test']['fall_videos'] if data else 6} fall videos, so one video moves "
@@ -193,6 +221,8 @@ def render(res: dict) -> str:
     L += ["## 10. CV bullet text (auto-filled from results.json)", ""]
     if b:
         L += [f"* {b['bullet_1']}"]
+        if "bullet_1_cv" in b:
+            L += [f"* (Same claim under 5-fold video-level CV, the more reliable estimate:) {b['bullet_1_cv']}"]
         L += [f"* {b['bullet_2']}"] if "bullet_2" in b else [f"* Latency bullet: **{NM}** on a real dataset video."]
         L += [f"* Pose estimator: {b['pose_estimator']}.", "",
               f"Automated check of every number in the bullets against results.json: "

@@ -39,6 +39,9 @@ def compute(prep) -> dict:
                              "max": int(max(m["frames"] for m in meta.values()))},
         "no_person_detected_frame_rate": float(np.average([m["missing_rate"] for m in meta.values()],
                                                           weights=[m["frames"] for m in meta.values()])),
+        "no_person_detected_frame_rate_by_class": {
+            name: float(np.average([m["missing_rate"] for m in grp], weights=[m["frames"] for m in grp]))
+            for name, grp in (("fall_videos", falls), ("adl_videos", adls)) if grp},
         "fall_interval_frames": {"min": int(min(fall_len)), "median": float(np.median(fall_len)),
                                  "max": int(max(fall_len))} if fall_len else None,
         "fall_videos_without_fall_annotation": int(sum(1 for m in falls if not m["fall_span"])),
@@ -68,9 +71,15 @@ def to_markdown(s: dict) -> str:
         f"* Frames: {s['frames_total']} ({s['frames_fall_videos']} in fall videos, {s['frames_adl_videos']} in ADL videos), "
         f"{s['fps']:.0f} fps, {s['duration_min_total']:.1f} min total; frames/video min/median/max = "
         f"{s['frames_per_video']['min']}/{s['frames_per_video']['median']:.0f}/{s['frames_per_video']['max']}.",
-        f"* Frames where YOLOv8n-pose found no person (interpolated): {100 * s['no_person_detected_frame_rate']:.2f}%.",
+        f"* Frames where YOLOv8n-pose found no person (interpolated): {100 * s['no_person_detected_frame_rate']:.2f}% "
+        f"(fall videos {100 * s['no_person_detected_frame_rate_by_class'].get('fall_videos', 0):.2f}%, ADL videos "
+        f"{100 * s['no_person_detected_frame_rate_by_class'].get('adl_videos', 0):.2f}%).",
         f"* Annotated falling interval (label 0) length, frames: min/median/max = {fi.get('min')}/{fi.get('median')}/{fi.get('max')}; "
         f"fall videos without a usable annotation: {s['fall_videos_without_fall_annotation']}; frames absent from the label CSVs: {s['frames_without_official_label']}.",
+        "* The official annotation marks exactly 30 'falling' frames (label 0) in every fall sequence (a labelling "
+        "convention of the dataset, ~1 s at 30 fps). The dataset page states label-0 frames are not used in the authors' "
+        "own classification; here they define the fall interval.",
+        "* The official `*-cam0.mp4` files are 640x240 depth+RGB previews; all processing uses the 640x480 RGB frame archives.",
         "", "## Windows", "",
         f"Window length {s['window_length']} frames. Positive = contains >= min(8, |fall interval|) annotated falling frames; "
         "negative = ADL window, or fall-video window with no falling/lying frame; ignored = partial overlap or post-fall lying only.", "",

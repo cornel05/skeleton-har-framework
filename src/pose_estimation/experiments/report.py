@@ -167,6 +167,12 @@ def cv_bullets(res: dict) -> Optional[dict]:
           f"recall {fx['recall']['mean']:.2f} and F1 {fx['f1']['mean']:.2f}.")
     out = {"bullet_1": b1, "values_1": {"recall": round(fx["recall"]["mean"], 2), "f1": round(fx["f1"]["mean"], 2),
                                         "videos": stats["videos"]}}
+    if "cv" in models[best]:
+        cv = models[best]["cv"]
+        out["bullet_1_cv"] = (f"Compared LSTM against baselines ({', '.join(names)}) on UR-Fall (cam0), {stats['videos']} videos "
+                              f"under 5-fold video-level cross-validation; best model ({SHORT[best]}) reaches fall-class "
+                              f"recall {cv['recall']['mean']:.2f} and F1 {cv['f1']['mean']:.2f}.")
+        out["values_1_cv"] = {"recall": round(cv["recall"]["mean"], 2), "f1": round(cv["f1"]["mean"], 2)}
     e2e = (bench or {}).get("e2e", {})
     lb = (bench or {}).get("best_model")  # e2e always runs the best *learned* classifier
     if e2e.get("fps") and "unavailable" not in e2e.get("source", "") and "PROXY" not in e2e.get("source", "") \
@@ -193,6 +199,12 @@ def verify_bullets(res: dict) -> List[str]:
     for key, src in (("recall", fx["recall"]["mean"]), ("f1", fx["f1"]["mean"])):
         if b["values_1"][key] != round(src, 2) or f"{round(src, 2):.2f}" not in b["bullet_1"]:
             errs.append(f"bullet_1 {key}")
+    if "bullet_1_cv" in b:
+        cv = res["models"][res["best_model"]["name"]]["cv"]
+        for key in ("recall", "f1"):
+            src = round(cv[key]["mean"], 2)
+            if b["values_1_cv"][key] != src or f"{key if key == 'recall' else 'F1'} {src:.2f}" not in b["bullet_1_cv"]:
+                errs.append(f"bullet_1_cv {key}")
     if "bullet_2" in b:
         e2e = res["bench"]["e2e"]
         for key, src in (("ms_per_frame", e2e["ms_per_frame"]), ("fps", e2e["fps"])):

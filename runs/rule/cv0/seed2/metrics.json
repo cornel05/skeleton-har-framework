@@ -1,0 +1,97 @@
+{
+  "model": "rule",
+  "protocol": "cv",
+  "fold": 0,
+  "seed": 2,
+  "split_seed": 0,
+  "git_commit": "b05f48f3389869cb3df39e1d810d784b6a9f0111",
+  "git_dirty": false,
+  "protocol_cfg": {
+    "dataset": "urfall-cam0",
+    "window_length": 32,
+    "train_stride": 4,
+    "eval_stride": 8,
+    "min_fall_frames": 8,
+    "split_seed": 0,
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "cv_folds": 5,
+    "test_frac": 0.2,
+    "val_frac": 0.2,
+    "mirror_train": true,
+    "early_stop_metric": "val_pr_auc",
+    "threshold_rule": "max_f1"
+  },
+  "n_train_videos": 42,
+  "n_val_videos": 14,
+  "n_test_videos": 14,
+  "n_train_windows": 1540,
+  "n_train_pos": 178,
+  "n_val_windows": 213,
+  "n_test_windows_all": 212,
+  "threads": 1,
+  "rule_params": {
+    "tau_v": 0.001,
+    "tau_ar": 0.4219133210182191
+  },
+  "params": 0,
+  "size_mb": 0.0,
+  "epochs_run": 0,
+  "best_epoch": 0,
+  "history": [],
+  "train_time_s": 0.0371207850000701,
+  "thresholds": {
+    "max_f1": 1.0
+  },
+  "results": {
+    "max_f1": {
+      "val": {
+        "precision": 0.875,
+        "recall": 0.7241379310344828,
+        "f1": 0.7924528301886793,
+        "pr_auc": 0.827635925396714,
+        "roc_auc": 0.958583208395802,
+        "balanced_accuracy": 0.8539167916041979,
+        "accuracy": 0.9483568075117371,
+        "tn": 181,
+        "fp": 3,
+        "fn": 8,
+        "tp": 21,
+        "n_pos": 29,
+        "n_neg": 184,
+        "threshold": 1.0
+      },
+      "test_window": {
+        "precision": 0.6666666666666666,
+        "recall": 0.5517241379310345,
+        "f1": 0.6037735849056604,
+        "pr_auc": 0.7163711749848567,
+        "roc_auc": 0.8855889974088101,
+        "balanced_accuracy": 0.7527406816822803,
+        "accuracy": 0.8960396039603961,
+        "tn": 165,
+        "fp": 8,
+        "fn": 13,
+        "tp": 16,
+        "n_pos": 29,
+        "n_neg": 173,
+        "threshold": 1.0
+      },
+      "test_event": {
+        "event_recall": 1.0,
+        "n_fall_videos": 6,
+        "fall_videos_detected": 6,
+        "false_alarms_per_adl_video": 0.5,
+        "adl_videos_with_alarm_frac": 0.5,
+        "false_alarms_per_hour": 269.1588785046729,
+        "n_adl_videos": 8,
+        "false_alarms": 4,
+        "adl_hours": 0.014861111111111111,
+        "event_recall_localized": 1.0
+      }
+    }
+  }
+}
