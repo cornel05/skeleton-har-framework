@@ -1,6 +1,6 @@
 # Skeleton-based fall detection — verified evaluation
 
-Generated 2026-09-24T16:18:15+00:00 from commit `463f0765a37d1452e2fec039c84e2b7e3d9df448` by `make report`. Every number below is read from `reports/results.json`, which is built only from logged runs (`runs/**/metrics.json`) and measured benchmarks (`reports/bench.json`).
+Generated 2026-09-24T16:18:49+00:00 from commit `24ae196ba6e36a757d3c24e61d5664f062414062` by `make report`. Every number below is read from `reports/results.json`, which is built only from logged runs (`runs/**/metrics.json`) and measured benchmarks (`reports/bench.json`).
 
 **Status: BLOCKED: no dataset -> no metrics were measured**
 
